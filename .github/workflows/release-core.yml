@@ -33,4 +33,16 @@ jobs:
         run: npm run build:core
 
       - name: Publish to npm (Trusted Publisher, OIDC)
-        run: npm publish -w core --provenance --access public
+        # Idempotent. The v* tag also drives release-python.yml, so a re-run
+        # (e.g. after a transient PyPI failure) must not hard-fail here — and the
+        # 0.1.0 bootstrap is published manually from the CLI to create the
+        # package before an OIDC Trusted Publisher can be configured for it.
+        # Publish only when this exact version is not already on the registry.
+        run: |
+          VERSION=$(node -p "require('./core/package.json').version")
+          PUBLISHED=$(npm view "@molcrafts/molplot@${VERSION}" version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$VERSION" ]; then
+            echo "@molcrafts/molplot@${VERSION} already published — skipping."
+          else
+            npm publish -w core --provenance --access public
+          fi

@@ -39,10 +39,18 @@ def register() -> None:
     global _registered
     if _registered:
         return
+    # Read each generated style file into an ``RcParams`` via the stable public
+    # ``matplotlib.rc_params_from_file`` (``use_default_template=False`` keeps only
+    # the file's own keys). This mirrors what matplotlib's own — private and
+    # version-unstable — ``style.core.read_style_directory`` does, without
+    # importing it (it was removed in newer matplotlib).
+    import matplotlib as mpl
     import matplotlib.style as mstyle
-    from matplotlib.style.core import read_style_directory
 
-    styles = read_style_directory(str(_PRESETS_DIR))
+    styles = {
+        path.stem: mpl.rc_params_from_file(path, use_default_template=False)
+        for path in sorted(_PRESETS_DIR.glob("*.mplstyle"))
+    }
     mstyle.library.update(styles)
     mstyle.available[:] = sorted(mstyle.library.keys())
     _registered = True

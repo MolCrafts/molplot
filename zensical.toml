@@ -1,33 +1,44 @@
+[project]
+site_name = "MolPlot"
+site_description = "Unified scientific charting: Vega-Lite on the web, scienceplots on paper, one preset."
+site_url = "https://molcrafts.github.io/molplot/"
+repo_url = "https://github.com/MolCrafts/molplot"
+repo_name = "MolCrafts/molplot"
+copyright = "Copyright &copy; 2026 MolCrafts"
 docs_dir = "docs"
 site_dir = "site"
 
-[site]
-name = "MolPlot"
-description = "Unified scientific charting: Vega-Lite on the web, scienceplots on paper, one preset."
+# Markdown extensions are intentionally not listed: Zensical's built-in default
+# set (admonition, attr_list, def_list, footnotes, md_in_html, toc permalink,
+# pymdownx.{arithmatex,details,emoji,highlight,inlinehilite,superfences,tabbed,
+# tasklist}, and more) already covers everything these docs use — the tabbed
+# web/Python blocks, admonitions, and fenced code.
 
-[theme]
-palette = "indigo"
+nav = [
+  { "Home" = "index.md" },
+  { "Getting Started" = "getting-started/index.md" },
+  { "Unified Preset" = [
+    "getting-started/preset.md",
+    { "Web (Vega-Lite)" = "getting-started/web.md" },
+    { "Python (scienceplots)" = "getting-started/python.md" },
+  ] },
+  { "API Reference" = "api/index.md" },
+]
 
-[[nav]]
-title = "Home"
-path = "index.md"
+# Shared MolCrafts theme (github.com/MolCrafts/molcrafts-zensical-theme). Provides
+# the brand palette, light/dark schemes, navigation features, and the home-page
+# hero/manual-home component system used by docs/index.md. The package must be
+# installed to build (see the `doc` dependency group in python/pyproject.toml).
+[project.theme]
+name = "molcrafts"
+language = "en"
 
-[[nav]]
-title = "Getting Started"
-path = "getting-started/index.md"
+# Selects the molplot accent (indigo) for links, hovers, and hero eyebrows.
+[project.extra.molcrafts]
+product = "molplot"
+accent = "#4f46e5"                        # primary (主) — molplot signature colour
+accent_soft = "rgba(79, 70, 229, 0.14)"   # secondary (副) — soft fill behind it
 
-[[nav]]
-title = "Unified Preset"
-path = "getting-started/preset.md"
-
-[[nav.children]]
-title = "Web (Vega-Lite)"
-path = "getting-started/web.md"
-
-[[nav.children]]
-title = "Python (scienceplots)"
-path = "getting-started/python.md"
-
-[[nav]]
-title = "API"
-path = "api/index.md"
+[[project.extra.social]]
+icon = "fontawesome/brands/github"
+link = "https://github.com/MolCrafts/molplot"

@@ -36,6 +36,17 @@ dev = [
     "pytest-cov",
 ]
 
+# Docs are built with Zensical from the single site config at ../zensical.toml
+# (the docs tree lives under ../docs/). That config sets `theme.name =
+# "molcrafts"` — the shared MolCrafts brand extension, on PyPI — so the docs
+# build is reproducible from this group alone.
+[dependency-groups]
+doc = [
+    "zensical>=0.0.45",
+    # The molcrafts docs theme (zensical.toml sets `theme.name = "molcrafts"`).
+    "molcrafts-zensical-theme>=0.1.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/MolCrafts/molplot"
 Repository = "https://github.com/MolCrafts/molplot"

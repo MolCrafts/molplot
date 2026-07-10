@@ -1,0 +1,66 @@
+name: Deploy docs to GitHub Pages
+
+# Builds the Zensical site (docs/ + the shared molcrafts theme) and publishes it
+# to https://molcrafts.github.io/molplot/. The docs are hand-written Markdown —
+# Zensical just reads the .md files under docs/ — so this job needs neither Node,
+# the TS `core/` build, the preset compiler, nor a Python wheel. It installs the
+# `doc` dependency group from python/pyproject.toml (zensical + the theme, both
+# on PyPI) and nothing else.
+#
+# One-time repo setup: Settings -> Pages -> Build and deployment -> Source =
+# "GitHub Actions" (this workflow provides the artifact + deployment).
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "docs/**"
+      - "zensical.toml"
+      - "python/pyproject.toml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serialize deployments; let an in-flight publish finish rather than cancelling.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    # Canonical repo only — forks have no Pages target, so skip there (matches
+    # the fork -> PR workflow: origin = Roy-Kid, upstream = MolCrafts).
+    if: github.repository == 'MolCrafts/molplot'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v6
+      - name: Build site
+        # Install the doc group into a venv under python/, then build from the
+        # repo root where zensical.toml lives — it writes the site to ./site.
+        run: |
+          cd python
+          uv venv
+          source .venv/bin/activate
+          uv pip install --group doc
+          cd ..
+          zensical build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.repository == 'MolCrafts/molplot'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

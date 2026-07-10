@@ -1,7 +1,7 @@
 [project]
 site_name = "MolPlot"
 site_description = "Unified scientific charting: Vega-Lite on the web, scienceplots on paper, one preset."
-site_url = "https://molcrafts.github.io/molplot/"
+site_url = "https://molplot.molcrafts.org/"
 repo_url = "https://github.com/MolCrafts/molplot"
 repo_name = "MolCrafts/molplot"
 copyright = "Copyright &copy; 2026 MolCrafts"

@@ -17,6 +17,9 @@ def test_render_line_draws_one_line_per_series():
             {"id": "b", "x": [0, 1, 2], "y": [2, 1, 4]},
         ]
     )
+    # The builder attaches web-only pan/zoom params; the paper renderer must
+    # ignore them and draw the initial view.
+    assert molplot.specs.zoom_params_of(spec)
     fig, ax = molplot.render(spec)
     assert len(ax.lines) == 2
 

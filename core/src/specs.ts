@@ -21,6 +21,80 @@ export interface SpecSize {
 
 const FALLBACK_STATUS_COLOR = "#a3a3a3";
 
+/** Continuous channels that can carry a scale binding. */
+export type ZoomChannel = "x" | "y";
+
+/** One scale-bound interval selection per zoomable axis. */
+export const ZOOM_PARAM = { x: "zoomX", y: "zoomY" } as const;
+
+/**
+ * Flags `VegaChart` stamps on a wheel event to say which axis gutter the
+ * pointer is over.
+ *
+ * A Vega event filter is compiled without the signal scope object, so it can
+ * call the geometry functions (`x()`, `y()`) but throws `ReferenceError: _ is
+ * not defined` the moment it reads a signal. That rules out the expression the
+ * region test wants — `y() > height` — because `height` is a signal. Hence the
+ * test happens where the geometry is knowable and arrives here as a boolean.
+ */
+export const ZOOM_EVENT_FLAG = {
+  x: "molplotZoomX",
+  y: "molplotZoomY",
+} as const;
+
+/** A scale-bound interval selection, one per zoomable axis. */
+export interface ZoomParam {
+  name: string;
+  bind: "scales";
+  select: { type: "interval"; encodings: ZoomChannel[]; zoom: string };
+}
+
+/**
+ * The zoom params a builder attached, wherever it legally placed them: top
+ * level for a unit spec, `layer[0]` for a layered one. Empty for a spec that
+ * never went through a builder (`RawChart`).
+ */
+export function zoomParamsOf(spec: VegaLiteSpec): ZoomParam[] {
+  const layers = spec.layer as { params?: ZoomParam[] }[] | undefined;
+  return (spec.params as ZoomParam[]) ?? layers?.[0]?.params ?? [];
+}
+
+/**
+ * Pan/zoom, one param per continuous axis: drag pans, wheel over an axis
+ * gutter zooms that axis alone, Shift+wheel zooms every bound axis, double
+ * click resets.
+ *
+ * The `view:` source matters. Vega-Lite's default for a scale binding is
+ * `scope` — the plot group — but axes render with `pointer-events: none`, so a
+ * wheel over an axis falls through to the SVG root and never enters that
+ * group. `view:` listens on the chart's own element instead, which both catches
+ * the axis wheel and keeps sibling charts on the page from reacting to it.
+ *
+ * `|| event.shiftKey` keeps the spec self-sufficient: Shift+wheel zooms even
+ * when nobody is stamping the event (a raw `vegaEmbed` of this spec, the docs).
+ *
+ * `bind: "scales"` attaches a `domainRaw` signal that outranks the computed
+ * domain, so `zero` / `nice` / an explicit `domain` still choose the *initial*
+ * view and the interaction owns the view from then on.
+ *
+ * Pass only continuous channels; binding a band scale warns "Scale bindings are
+ * currently only supported for scales with unbinned, continuous domains."
+ *
+ * Inert outside the browser: the matplotlib translator and vl-convert both
+ * ignore `params` and render the initial view.
+ */
+function interactionParams(channels: ZoomChannel[]): ZoomParam[] {
+  return channels.map((channel) => ({
+    name: ZOOM_PARAM[channel],
+    select: {
+      type: "interval",
+      encodings: [channel],
+      zoom: `view:wheel![event.${ZOOM_EVENT_FLAG[channel]} || event.shiftKey]`,
+    },
+    bind: "scales",
+  }));
+}
+
 /** Strip undefined so specs compare cleanly in tests and serialize small. */
 function clean<T extends Record<string, unknown>>(obj: T): T {
   for (const k of Object.keys(obj)) {
@@ -145,6 +219,10 @@ export function lineSpec(
     encoding: xy,
     layer: [
       {
+        // Params belong to exactly one unit layer. At the top level of a
+        // layered spec Vega-Lite copies them into every layer and Vega then
+        // throws "Duplicate signal name" while compiling stays silent.
+        params: interactionParams(["x", "y"]),
         mark: lineMark,
         encoding: lineEncoding,
       },
@@ -154,12 +232,13 @@ export function lineSpec(
           type: "point",
           filled: true,
           size: theme.geometry.markerSize ** 2,
+          clip: true,
         },
         encoding: { color: colorEnc },
       },
       {
         // Invisible wide hit target → precise hover tooltip + click datum.
-        mark: { type: "point", opacity: 0, size: 160 },
+        mark: { type: "point", opacity: 0, size: 160, clip: true },
         encoding: {
           color: colorEnc,
           tooltip: [
@@ -199,11 +278,13 @@ export function scatterSpec(
 
   const layers: Record<string, unknown>[] = [
     {
+      params: interactionParams(["x", "y"]),
       data: { name: "table" },
       mark: clean({
         type: "point",
         filled: true,
         size: markSize,
+        clip: true,
         color: colorEnc
           ? undefined
           : ((marker.color as string) ?? theme.palette[0]),
@@ -236,6 +317,7 @@ export function scatterSpec(
         size: markSize * 4,
         stroke: theme.highlightRing,
         strokeWidth: 2,
+        clip: true,
       },
       encoding: {
         x: { field: "x", type: "quantitative" },
@@ -312,7 +394,14 @@ export function barSpec(
   });
 
   const layers: Record<string, unknown>[] = [
-    { data: { name: "table" }, mark: { type: "bar" }, encoding: barEncoding },
+    {
+      // Only the value axis is continuous; the category axis is a band scale
+      // and cannot take a scale binding.
+      params: interactionParams([valChannel]),
+      data: { name: "table" },
+      mark: { type: "bar", clip: true },
+      encoding: barEncoding,
+    },
   ];
 
   // Optional line-over-bars overlay (fed via the "line" dataset).
@@ -320,7 +409,7 @@ export function barSpec(
   if (hasLine) {
     layers.push({
       data: { name: "line" },
-      mark: { type: "line", point: true, strokeWidth: 2 },
+      mark: { type: "line", point: true, strokeWidth: 2, clip: true },
       encoding: {
         [catChannel]: { field: "cat", type: "nominal" },
         [valChannel]: { field: "val", type: "quantitative" },
@@ -373,7 +462,10 @@ export function ganttSpec(
     height,
     autosize: { type: "fit", contains: "padding" },
     data: { name: "table" },
-    mark: { type: "bar", cornerRadius: 2 },
+    // A unit spec, so the params sit at the top level. Only the temporal axis
+    // is continuous; the task-label axis is a band scale.
+    params: interactionParams(["x"]),
+    mark: { type: "bar", cornerRadius: 2, clip: true },
     encoding: {
       x: {
         field: "start",

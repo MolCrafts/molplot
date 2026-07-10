@@ -13,10 +13,58 @@ from typing import Any, Sequence
 from .preset import DEFAULT_PRESET, Mode, resolve
 from .vega_config import vega_config
 
-__all__ = ["line_spec", "scatter_spec", "bar_spec", "gantt_spec", "VL_SCHEMA"]
+__all__ = [
+    "line_spec",
+    "scatter_spec",
+    "bar_spec",
+    "gantt_spec",
+    "zoom_params_of",
+    "VL_SCHEMA",
+    "ZOOM_PARAM",
+    "ZOOM_EVENT_FLAG",
+]
 
 VL_SCHEMA = "https://vega.github.io/schema/vega-lite/v5.json"
 _FALLBACK_STATUS = "#a3a3a3"
+
+#: One scale-bound interval selection per zoomable axis.
+ZOOM_PARAM = {"x": "zoomX", "y": "zoomY"}
+
+#: Flags the TS ``VegaChart`` stamps on a wheel event to name the axis gutter
+#: the pointer is over. A Vega event filter is compiled without the signal scope
+#: object, so it may call ``x()`` / ``y()`` but throws on any signal read — which
+#: rules out the ``y() > height`` the region test would otherwise want.
+ZOOM_EVENT_FLAG = {"x": "molplotZoomX", "y": "molplotZoomY"}
+
+
+def zoom_params_of(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """The zoom params a builder attached, wherever it legally placed them: top
+    level for a unit spec, ``layer[0]`` for a layered one. Mirrors
+    ``zoomParamsOf`` in ``core/src/specs.ts``."""
+    return spec.get("params") or spec["layer"][0]["params"]
+
+
+def _interaction_params(channels: Sequence[str]) -> list[dict[str, Any]]:
+    """Pan/zoom, one param per continuous axis. Mirrors ``interactionParams``
+    in ``core/src/specs.ts``: drag pans, a wheel over one axis gutter zooms that
+    axis, Shift+wheel zooms every bound axis, double click resets.
+
+    Web-only: :func:`molplot.render.render` and ``vl-convert`` both ignore
+    ``params`` and draw the initial view. ``channels`` must name only continuous
+    channels — a band scale cannot take a scale binding.
+    """
+    return [
+        {
+            "name": ZOOM_PARAM[channel],
+            "select": {
+                "type": "interval",
+                "encodings": [channel],
+                "zoom": f"view:wheel![event.{ZOOM_EVENT_FLAG[channel]} || event.shiftKey]",
+            },
+            "bind": "scales",
+        }
+        for channel in channels
+    ]
 
 
 def _clean(d: dict[str, Any]) -> dict[str, Any]:
@@ -118,10 +166,13 @@ def line_spec(
                 "y": {"field": "y", "type": "quantitative", "axis": _axis(y_label), "scale": _scale(y_log, y_domain)},
             },
             "layer": [
-                {"mark": line_mark, "encoding": line_encoding},
+                # Params belong to exactly one unit layer: at the top level of a
+                # layered spec Vega-Lite copies them into every layer and Vega
+                # then throws "Duplicate signal name" at parse time.
+                {"params": _interaction_params(["x", "y"]), "mark": line_mark, "encoding": line_encoding},
                 {
                     "transform": [{"filter": {"field": "key", "oneOf": marker_keys}}],
-                    "mark": {"type": "point", "filled": True, "size": theme["geometry"]["markerSize"] ** 2},
+                    "mark": {"type": "point", "filled": True, "size": theme["geometry"]["markerSize"] ** 2, "clip": True},
                     "encoding": {"color": color_enc},
                 },
             ],
@@ -167,11 +218,12 @@ def scatter_spec(
         color_enc = {"field": "c", "type": "nominal", "scale": None, "legend": None}
 
     mark_size = (size or theme["geometry"]["markerSize"]) ** 2
-    mark = _clean({"type": "point", "filled": True, "size": mark_size, "color": None if color_enc else (color if isinstance(color, str) else theme["palette"][0])})
+    mark = _clean({"type": "point", "filled": True, "size": mark_size, "clip": True, "color": None if color_enc else (color if isinstance(color, str) else theme["palette"][0])})
     spec = _base(preset, mode, width, height)
     spec.update(
         {
             "data": {"values": rows},
+            "params": _interaction_params(["x", "y"]),
             "mark": mark,
             "encoding": _clean(
                 {
@@ -230,7 +282,15 @@ def bar_spec(
         }
     )
     spec = _base(preset, mode, width, height)
-    spec.update({"data": {"values": rows}, "mark": {"type": "bar"}, "encoding": encoding})
+    # Only the value axis is continuous; the category axis is a band scale.
+    spec.update(
+        {
+            "data": {"values": rows},
+            "params": _interaction_params([val_channel]),
+            "mark": {"type": "bar", "clip": True},
+            "encoding": encoding,
+        }
+    )
     return spec
 
 
@@ -279,7 +339,9 @@ def gantt_spec(
     spec.update(
         {
             "data": {"values": rows},
-            "mark": {"type": "bar", "cornerRadius": 2},
+            # Only the temporal axis is continuous; the task-label axis is a band scale.
+            "params": _interaction_params(["x"]),
+            "mark": {"type": "bar", "cornerRadius": 2, "clip": True},
             "encoding": {
                 "x": {"field": "start", "type": "temporal", "axis": _axis(x_label), "title": None},
                 "x2": {"field": "end"},

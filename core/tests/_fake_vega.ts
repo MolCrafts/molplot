@@ -1,5 +1,32 @@
 import type { VegaEmbed } from "../src/vega_loader";
 
+/** A container element carrying a live count of its bound listeners. */
+export type FakeContainer = HTMLElement & { listenerCount(): number };
+
+/**
+ * A container stub honouring the slice of the element contract `VegaChart`
+ * relies on: it binds a wheel listener for axis-hover zoom and queries the
+ * rendered `<svg>`. Headless runs never render, so `querySelector` returns null
+ * and the handler bails. `dims()` supplies its own fallback size, so there is
+ * no `getBoundingClientRect` to stub.
+ *
+ * The pointer classification itself is pure — see `axisChannelAt` — and is
+ * tested directly rather than through this double.
+ */
+export function makeFakeContainer(): FakeContainer {
+  const listeners = new Set<EventListener>();
+  return {
+    addEventListener: (_type: string, fn: EventListener) => {
+      listeners.add(fn);
+    },
+    removeEventListener: (_type: string, fn: EventListener) => {
+      listeners.delete(fn);
+    },
+    querySelector: () => null,
+    listenerCount: () => listeners.size,
+  } as unknown as FakeContainer;
+}
+
 /**
  * A stub vega-embed that records the spec it would render and the data pushed
  * into the view, and lets tests fire a synthetic click. Mirrors the old

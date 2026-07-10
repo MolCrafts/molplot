@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "@rstest/core";
 import { LineChart } from "../src/line_chart";
 import { __setVegaEmbedForTesting } from "../src/vega_loader";
-import { type FakeVega, makeFakeVega } from "./_fake_vega";
+import {
+  type FakeContainer,
+  type FakeVega,
+  makeFakeContainer,
+  makeFakeVega,
+} from "./_fake_vega";
 
-const container = {} as unknown as HTMLElement;
+let container: FakeContainer;
 let fake: FakeVega;
 
 beforeEach(() => {
+  container = makeFakeContainer();
   fake = makeFakeVega();
   __setVegaEmbedForTesting(fake.embed);
 });
@@ -78,5 +84,16 @@ describe("LineChart", () => {
     await chart.ready();
     chart.dispose();
     expect(fake.finalized).toBe(1);
+  });
+
+  it("binds one axis-hover wheel listener and drops it on dispose", async () => {
+    // The listener lives on the container, which survives every re-embed, so
+    // setAxisRange (which re-embeds) must not add a second one.
+    const chart = new LineChart(container, { series: [{ id: "a" }] });
+    await chart.ready();
+    await chart.setAxisRange("x", [0, 1]);
+    expect(container.listenerCount()).toBe(1);
+    chart.dispose();
+    expect(container.listenerCount()).toBe(0);
   });
 });

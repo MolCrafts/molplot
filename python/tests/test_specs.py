@@ -54,3 +54,59 @@ def test_vega_config_matches_preset_palette():
     cfg = molplot.vega_config("molplot")
     assert cfg["range"]["category"][0] == "#1f77b4"
     assert cfg["axis"]["grid"] is True
+
+
+from molplot.specs import ZOOM_EVENT_FLAG, ZOOM_PARAM, zoom_params_of
+
+
+def _marks_of(spec):
+    """Every mark in the spec tree, layered or unit. Mirrors `marksOf` in
+    core/tests/specs.test.ts."""
+    return [layer["mark"] for layer in spec["layer"]] if "layer" in spec else [spec["mark"]]
+
+
+def _channels(spec):
+    return [p["select"]["encodings"][0] for p in zoom_params_of(spec)]
+
+
+def _all_specs():
+    return {
+        "line": molplot.line_spec([{"id": "a", "x": [0, 1], "y": [1, 2]}]),
+        "scatter": molplot.scatter_spec([0, 1], [0, 1]),
+        "bar": molplot.bar_spec(["a"], [{"id": "s", "values": [1]}]),
+        "gantt": molplot.gantt_spec([{"id": "t", "label": "L", "start": 0, "end": 1, "status": "ok"}], {"ok": "#22c55e"}),
+    }
+
+
+def test_every_chart_declares_one_scale_bound_param_per_zoomable_axis():
+    """The interaction is part of the portable spec, so the TS and Python
+    builders must emit it identically (see core/tests/specs.test.ts)."""
+    for spec in _all_specs().values():
+        for param in zoom_params_of(spec):
+            channel = param["select"]["encodings"][0]
+            assert param["name"] == ZOOM_PARAM[channel]
+            assert param["bind"] == "scales"
+            assert param["select"]["type"] == "interval"
+            # One param per scale is what lets an axis-gutter wheel zoom one axis.
+            assert len(param["select"]["encodings"]) == 1
+            # `view:` reaches the axes (they render pointer-events: none, outside
+            # the plot group); the shift clause keeps the spec self-sufficient.
+            flag = ZOOM_EVENT_FLAG[channel]
+            assert param["select"]["zoom"] == f"view:wheel![event.{flag} || event.shiftKey]"
+
+
+def test_only_continuous_channels_are_bound():
+    specs = _all_specs()
+    assert _channels(specs["line"]) == ["x", "y"]
+    assert _channels(specs["scatter"]) == ["x", "y"]
+    # The remaining axis of each is a band scale, which cannot take a binding.
+    assert _channels(specs["bar"]) == ["y"]
+    assert _channels(specs["gantt"]) == ["x"]
+    horizontal = molplot.bar_spec(["a"], [{"id": "s", "values": [1]}], orientation="h")
+    assert _channels(horizontal) == ["x"]
+
+
+def test_marks_are_clipped_to_the_plot_rect():
+    """Without clip a zoomed-in mark paints over the axes."""
+    for spec in _all_specs().values():
+        assert all(mark["clip"] is True for mark in _marks_of(spec))

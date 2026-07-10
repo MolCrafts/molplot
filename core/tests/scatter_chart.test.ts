@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "@rstest/core";
 import { ScatterChart } from "../src/scatter_chart";
 import { __setVegaEmbedForTesting } from "../src/vega_loader";
-import { type FakeVega, makeFakeVega } from "./_fake_vega";
+import { type FakeVega, makeFakeContainer, makeFakeVega } from "./_fake_vega";
 
-const container = {} as unknown as HTMLElement;
+let container: HTMLElement;
 let fake: FakeVega;
 
 beforeEach(() => {
+  container = makeFakeContainer();
   fake = makeFakeVega();
   __setVegaEmbedForTesting(fake.embed);
 });

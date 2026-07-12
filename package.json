@@ -1,6 +1,6 @@
 {
   "name": "molplot",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MolPlot — Vega-Lite scientific charting with a unified, matplotlib-portable preset",
   "author": "Roy Kid",
   "license": "BSD-3-Clause",

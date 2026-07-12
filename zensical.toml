@@ -13,7 +13,7 @@ site_dir = "site"
 # vega runtime is a lazy chunk that downloads only when a chart mounts. This is
 # what makes the `<molplot-chart>` element and the ```molplot fence render live.
 extra_javascript = [
-  "https://cdn.jsdelivr.net/npm/@molcrafts/molplot@0.1/dist/elements.js",
+  { path = "https://cdn.jsdelivr.net/npm/@molcrafts/molplot@latest/dist/elements.js", type = "module" },
 ]
 
 nav = [

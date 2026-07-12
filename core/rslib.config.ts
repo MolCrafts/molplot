@@ -25,7 +25,7 @@ export default defineConfig({
     {
       format: "esm",
       bundle: true,
-      dts: false,
+      dts: true,
       // rslib externalizes package `dependencies` by default; turn that off here
       // so vega/vega-lite/vega-embed are actually bundled into this artifact
       // (the dynamic import is still code-split into a lazy chunk).

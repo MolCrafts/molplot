@@ -1,6 +1,6 @@
 {
   "name": "@molcrafts/molplot",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "type": "module",
   "exports": {
     ".": {
@@ -8,9 +8,13 @@
       "import": "./dist/index.js"
     },
     "./elements": {
+      "types": "./dist/element_entry.d.ts",
       "import": "./dist/elements.js"
     }
   },
+  "sideEffects": [
+    "./dist/elements.js"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/MolCrafts/molplot.git",

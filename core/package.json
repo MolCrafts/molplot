@@ -6,6 +6,9 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./elements": {
+      "import": "./dist/elements.js"
     }
   },
   "repository": {

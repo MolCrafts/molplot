@@ -45,6 +45,11 @@ doc = [
     "zensical>=0.0.45",
     # The molcrafts docs theme (zensical.toml sets `theme.name = "molcrafts"`).
     "molcrafts-zensical-theme>=0.1.0",
+    # This package itself, so the `molplot` custom-fence formatter
+    # (molplot.mdx.molplot_fence) is importable while the site compiles.
+    "molcrafts-molplot",
+    # YAML authoring for the `molplot` fenced block (molplot.mdx).
+    "pyyaml>=6.0",
 ]
 
 [project.urls]

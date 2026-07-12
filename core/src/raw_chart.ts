@@ -1,6 +1,8 @@
 import { VegaChart } from "./chart_base";
+import type { PresetName } from "./preset";
 import type { VegaLiteSpec } from "./specs";
 import { type ChartTheme, vegaConfig } from "./theme";
+import type { ThemeMode } from "./types";
 
 /**
  * Escape hatch: render an arbitrary Vega-Lite spec verbatim. Now that the
@@ -17,13 +19,21 @@ import { type ChartTheme, vegaConfig } from "./theme";
 export interface RawChartConfig {
   /** A Vega-Lite top-level spec. Inline `data.values` is rendered as-is. */
   spec: VegaLiteSpec;
+  /**
+   * Which unified preset to inject as the spec `config` when the spec carries
+   * none. Defaults to the default preset — the same tokens the Python package
+   * applies. A spec with its own `config` is always respected verbatim.
+   */
+  preset?: PresetName;
+  /** Theme mode. `auto` (default) tracks `<html class="dark">`. */
+  theme?: ThemeMode;
 }
 
 export class RawChart extends VegaChart {
   private spec: VegaLiteSpec;
 
   constructor(container: HTMLElement, config: RawChartConfig) {
-    super(container, "auto", undefined);
+    super(container, config.theme ?? "auto", config.preset);
     this.spec = config.spec;
   }
 

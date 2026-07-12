@@ -8,11 +8,13 @@ copyright = "Copyright &copy; 2026 MolCrafts"
 docs_dir = "docs"
 site_dir = "site"
 
-# Markdown extensions are intentionally not listed: Zensical's built-in default
-# set (admonition, attr_list, def_list, footnotes, md_in_html, toc permalink,
-# pymdownx.{arithmatex,details,emoji,highlight,inlinehilite,superfences,tabbed,
-# tasklist}, and more) already covers everything these docs use — the tabbed
-# web/Python blocks, admonitions, and fenced code.
+# Load the self-registering `<molplot-chart>` Web Component (the `elements`
+# bundle of @molcrafts/molplot). It registers the custom element cheaply; the
+# vega runtime is a lazy chunk that downloads only when a chart mounts. This is
+# what makes the `<molplot-chart>` element and the ```molplot fence render live.
+extra_javascript = [
+  "https://cdn.jsdelivr.net/npm/@molcrafts/molplot@0.1/dist/elements.js",
+]
 
 nav = [
   { "Home" = "index.md" },
@@ -21,8 +23,49 @@ nav = [
     "getting-started/preset.md",
     { "Web (Vega-Lite)" = "getting-started/web.md" },
     { "Python (scienceplots)" = "getting-started/python.md" },
+    { "Charts in Markdown" = "getting-started/markdown.md" },
   ] },
   { "API Reference" = "api/index.md" },
+]
+
+# Markdown extensions. Declaring this section REPLACES Zensical's built-in
+# default set (it is not merged), so the full default set is reproduced verbatim
+# below — the only addition is the `molplot` custom fence (last custom_fence
+# entry), which compiles a ```molplot block to a <molplot-chart> element via
+# molplot.mdx.molplot_fence (the Python package must be importable at build
+# time; see the `doc` group in python/pyproject.toml). Keep this in sync with
+# Zensical's defaults on upgrade.
+[project.markdown_extensions]
+abbr = {}
+admonition = {}
+attr_list = {}
+def_list = {}
+footnotes = {}
+md_in_html = {}
+
+[project.markdown_extensions.toc]
+permalink = true
+
+[project.markdown_extensions.pymdownx]
+betterem = {}
+caret = {}
+details = {}
+inlinehilite = {}
+keys = {}
+magiclink = {}
+mark = {}
+smartsymbols = {}
+tilde = {}
+arithmatex = { generic = true }
+emoji = { emoji_generator = "zensical.extensions.emoji.to_svg", emoji_index = "zensical.extensions.emoji.twemoji" }
+highlight = { anchor_linenums = true, line_spans = "__span", pygments_lang_class = true }
+tabbed = { alternate_style = true, combine_header_slug = true }
+tasklist = { custom_checkbox = true }
+
+[project.markdown_extensions.pymdownx.superfences]
+custom_fences = [
+  { name = "mermaid", class = "mermaid" },
+  { name = "molplot", class = "molplot", format = "molplot.mdx.molplot_fence", validator = "molplot.mdx.molplot_validator" },
 ]
 
 # Shared MolCrafts theme (github.com/MolCrafts/molcrafts-zensical-theme). Provides

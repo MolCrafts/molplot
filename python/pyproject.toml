@@ -29,11 +29,15 @@ dependencies = [
 
 [project.optional-dependencies]
 convert = ["vl-convert-python>=1.6"]
+# YAML authoring for the `molplot` Markdown fence formatter (molplot.mdx).
+mdx = ["pyyaml>=6.0"]
 dev = [
     "build>=1.0",
     "hatchling",
     "pytest>=7.0",
     "pytest-cov",
+    # mdx's runtime dep, so test_mdx.py can exercise the YAML path.
+    "pyyaml>=6.0",
 ]
 
 # Docs are built with Zensical from the single site config at ../zensical.toml

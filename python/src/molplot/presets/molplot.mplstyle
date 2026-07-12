@@ -9,8 +9,8 @@ figure.facecolor: ffffff
 axes.facecolor: ffffff
 savefig.facecolor: ffffff
 
-font.family: sans-serif
-font.sans-serif: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif
+font.family: serif
+font.serif: Times New Roman, Times, Nimbus Roman, serif
 font.size: 10
 axes.titlesize: 12
 axes.labelsize: 10
@@ -18,18 +18,18 @@ xtick.labelsize: 9
 ytick.labelsize: 9
 legend.fontsize: 9
 
-axes.prop_cycle: cycler('color', ['1f77b4', 'ff7f0e', '2ca02c', 'd62728', '9467bd', '8c564b', 'e377c2', '7f7f7f', 'bcbd22', '17becf', 'aec7e8', 'ffbb78', '98df8a', 'ff9896', 'c5b0d5', 'c49c94', 'f7b6d2', 'c7c7c7', 'dbdb8d', '9edae5'])
-lines.linewidth: 2
+axes.prop_cycle: cycler('color', ['0c5da5', '00b945', 'ff9500', 'ff2c00', '845b97', '474747', '9e9e9e'])
+lines.linewidth: 1
 lines.markersize: 6
 
-text.color: 52525b
-axes.edgecolor: 52525b
-axes.labelcolor: 52525b
-xtick.color: 52525b
-ytick.color: 52525b
+text.color: 000000
+axes.edgecolor: 000000
+axes.labelcolor: 000000
+xtick.color: 000000
+ytick.color: 000000
 
 axes.grid: True
-grid.color: d4d4d8
+grid.color: cccccc
 grid.linewidth: 0.5
 grid.alpha: 1.0
 axes.axisbelow: True

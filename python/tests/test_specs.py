@@ -13,7 +13,7 @@ def test_line_spec_shape_and_config():
     assert spec["$schema"].endswith("vega-lite/v5.json")
     assert spec["data"]["values"][0] == {"s": "a", "key": "A", "i": 0, "x": 0, "y": 1}
     # Unified preset injected as the VL config.
-    assert spec["config"]["range"]["category"][0] == "#1f77b4"
+    assert spec["config"]["range"]["category"][0] == "#0c5da5"
     color = spec["layer"][0]["encoding"]["color"]
     assert color["scale"]["domain"] == ["A"]
     assert color["legend"] == {"title": None}
@@ -52,7 +52,7 @@ def test_gantt_spec_spans_and_status_colours():
 
 def test_vega_config_matches_preset_palette():
     cfg = molplot.vega_config("molplot")
-    assert cfg["range"]["category"][0] == "#1f77b4"
+    assert cfg["range"]["category"][0] == "#0c5da5"
     assert cfg["axis"]["grid"] is True
 
 

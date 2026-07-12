@@ -12,7 +12,7 @@ def test_unknown_preset_falls_back():
 
 
 def test_palette_matches_tokens():
-    assert molplot.palette("molplot")[0] == "#1f77b4"
+    assert molplot.palette("molplot")[0] == "#0c5da5"
     assert molplot.palette() == get_preset("molplot")["palette"]["categorical"]
 
 
@@ -26,7 +26,7 @@ def test_resolve_light_vs_dark():
 def test_rc_params_inject_palette_and_type_scale():
     rc = rc_params("molplot", "light")
     colors = rc["axes.prop_cycle"].by_key()["color"]
-    assert colors[0] == "#1f77b4"
+    assert colors[0] == "#0c5da5"
     assert rc["font.size"] == 10
     assert rc["axes.grid"] is True
 

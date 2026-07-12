@@ -33,7 +33,7 @@ molplot.use("molplot-paper")
 with molplot.style("molplot", mode="dark"):
     plt.plot(x, y)                # scoped; restores rcParams on exit
 
-molplot.palette()[0]              # '#1f77b4' — same categorical colours as the web
+molplot.palette()[0]              # '#0c5da5' — same categorical colours as the web
 ```
 
 `plt.style.use("molplot")` also works directly (the `.mplstyle` files are

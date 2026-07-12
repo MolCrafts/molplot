@@ -18,14 +18,14 @@ def test_style_context_applies_and_restores():
     before = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     with molplot.style("molplot"):
         inside = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-        assert inside[0] == "#1f77b4"
+        assert inside[0] == "#0c5da5"
     after = plt.rcParams["axes.prop_cycle"].by_key()["color"]
     assert after == before
 
 
 def test_use_applies_persistently():
     molplot.use("molplot")
-    assert plt.rcParams["axes.prop_cycle"].by_key()["color"][0] == "#1f77b4"
+    assert plt.rcParams["axes.prop_cycle"].by_key()["color"][0] == "#0c5da5"
     assert plt.rcParams["font.size"] == 10
 
 

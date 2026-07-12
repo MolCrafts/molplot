@@ -2,9 +2,10 @@ import { getPreset } from "./preset";
 import type { ThemeMode } from "./types";
 
 /**
- * 20-entry categorical palette (d3 category20). Re-exported for API
- * compatibility with the former plotly build; the authoritative copy now
- * lives in `presets/molplot.json` and flows through {@link getPreset}.
+ * Categorical palette — scienceplots' standard seven-colour "science" cycle.
+ * Re-exported for API compatibility with the former plotly build; the
+ * authoritative copy now lives in `presets/molplot.json` and flows through
+ * {@link getPreset}.
  */
 export const CHART_PALETTE: readonly string[] = getPreset().palette.categorical;
 

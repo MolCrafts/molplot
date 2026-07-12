@@ -14,7 +14,7 @@ describe("preset", () => {
 
   it("CHART_PALETTE matches the default preset tokens", () => {
     expect(CHART_PALETTE).toEqual(getPreset("molplot").palette.categorical);
-    expect(CHART_PALETTE[0]).toBe("#1f77b4");
+    expect(CHART_PALETTE[0]).toBe("#0c5da5");
   });
 });
 
@@ -39,7 +39,7 @@ describe("vegaConfig", () => {
     const cfg = vegaConfig(resolveTheme("light"));
     // biome-ignore lint/suspicious/noExplicitAny: loose VL config shape
     const c = cfg as any;
-    expect(c.range.category[0]).toBe("#1f77b4");
+    expect(c.range.category[0]).toBe("#0c5da5");
     expect(c.axis.grid).toBe(true);
     expect(typeof c.axis.labelFontSize).toBe("number");
   });

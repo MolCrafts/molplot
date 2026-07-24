@@ -21,3 +21,6 @@ site/
 # OS / editors
 .DS_Store
 *.log
+
+.tox/
+.venv/

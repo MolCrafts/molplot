@@ -2,8 +2,8 @@ import path from "node:path";
 import { defineConfig } from "@rsbuild/core";
 import { pluginReact } from "@rsbuild/plugin-react";
 
-// The demo bundles @molcrafts/molplot from source (not dist) so edits to the
-// core hot-reload here, mirroring the molvis page/ setup.
+// The example bundles @molcrafts/molplot from source (not dist), so edits to
+// the Web Component hot-reload without publishing or rebuilding the package.
 export default defineConfig({
   plugins: [pluginReact()],
   source: {
@@ -19,5 +19,5 @@ export default defineConfig({
     watchFiles: [{ paths: [path.resolve(import.meta.dirname, "../core/src")] }],
   },
   server: { port: 3000 },
-  html: { title: "MolPlot Gallery" },
+  html: { title: "MolPlot Web Component Example" },
 });

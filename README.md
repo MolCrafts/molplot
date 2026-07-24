@@ -27,7 +27,7 @@ molplot/
 ├── presets/            # canonical design tokens (single source of truth) + JSON schema
 ├── scripts/            # build-presets.mjs — compiles presets → per-package artifacts
 ├── core/               # @molcrafts/molplot — Vega-Lite chart classes (TypeScript)
-├── page/               # demo gallery (React 19 + rsbuild)
+├── example/            # Web Component example (React 19 + rsbuild)
 ├── python/             # molcrafts-molplot — scienceplots wrapper + VL→matplotlib
 └── docs/               # zensical docs
 ```
@@ -62,8 +62,8 @@ fig, ax = molplot.render(spec)               # same spec → matplotlib figure
 ```bash
 npm install
 npm run build:presets    # regenerate preset artifacts from presets/*.json
-npm run dev:page         # demo gallery at localhost:3000
-npm run typecheck        # core + page
+npm run dev:example      # Web Component example at localhost:3000
+npm run typecheck        # core + example
 npm test                 # core (rstest) + python (pytest)
 npm run lint             # biome
 ```

@@ -47,6 +47,8 @@ export {
   CHART_DEFAULT_COLOR,
   CHART_PALETTE,
   type ChartTheme,
+  fontScaleForWidth,
+  MOLPLOT_DESIGN_WIDTH,
   resolveTheme,
   vegaConfig,
 } from "./theme";

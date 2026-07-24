@@ -26,8 +26,9 @@ import type { ThemeMode } from "./types";
  * ```
  *
  * Attributes: `preset` (unified preset name, default the molplot preset),
- * `theme` (`auto` | `light` | `dark`, default `auto`), and `spec` (inline JSON,
- * a one-line alternative to the script block).
+ * `theme` (`auto` | `light` | `dark`, default `auto`), `interactive` (`false`
+ * disables the default pan/zoom bindings), and `spec` (inline JSON, a one-line
+ * alternative to the script block).
  */
 
 /**
@@ -53,6 +54,52 @@ function parseTheme(value: string | null): ThemeMode {
   return value === "light" || value === "dark" ? value : "auto";
 }
 
+/** Interaction is on by default; accept common false-like HTML values. */
+export function parseInteractive(value: string | null): boolean {
+  if (value === null || value === "") return true;
+  return !["false", "0", "off", "none"].includes(value.toLowerCase());
+}
+
+/** Parse `4:3`, `4/3`, or a numeric width:height ratio. */
+export function parseAspect(value: string | null): number {
+  if (!value) return 4 / 3;
+  const parts = value.split(/[:/]/).map(Number);
+  const ratio =
+    parts.length === 2 && parts[0] && parts[1]
+      ? parts[0] / parts[1]
+      : Number(value);
+  return Number.isFinite(ratio) && ratio > 0 ? ratio : 4 / 3;
+}
+
+const ELEMENT_STYLE_ID = "molplot-element-defaults";
+
+function installElementStyles(): void {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(ELEMENT_STYLE_ID)) return;
+  const style = document.createElement("style");
+  style.id = ELEMENT_STYLE_ID;
+  style.textContent = `
+:where([data-molplot-chart]) {
+  display: block;
+  position: relative;
+  box-sizing: border-box;
+  width: min(100%, var(--molplot-width, 28rem));
+  aspect-ratio: var(--molplot-aspect, 16 / 10);
+  /* Inner air so axis titles clear the host edge without eating the plot. */
+  padding: 0.5rem;
+  overflow: hidden;
+}
+:where([data-molplot-chart]) > :where(.molplot-chart__surface) {
+  position: absolute;
+  inset: 0.5rem;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+`;
+  document.head.appendChild(style);
+}
+
 /**
  * Register the `<molplot-chart>` custom element. Idempotent and browser-only:
  * a no-op when there is no `customElements` registry (SSR/Node) or the tag is
@@ -67,14 +114,24 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
   )
     return;
   if (customElements.get(tag)) return;
+  installElementStyles();
 
   class MolplotChartElement extends HTMLElement {
-    static readonly observedAttributes = ["spec", "preset", "theme"];
+    static readonly observedAttributes = [
+      "spec",
+      "preset",
+      "theme",
+      "interactive",
+      "width",
+      "aspect",
+    ];
 
     private chart: RawChart | null = null;
     private surface: HTMLElement | null = null;
 
     connectedCallback(): void {
+      this.setAttribute("data-molplot-chart", "");
+      this.applySizing();
       this.mount();
     }
 
@@ -82,7 +139,8 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
       this.teardown();
     }
 
-    attributeChangedCallback(): void {
+    attributeChangedCallback(name: string): void {
+      if (name === "width" || name === "aspect") this.applySizing();
       // Attributes are also set before the first connect; only react once live.
       if (this.isConnected && this.chart) {
         this.teardown();
@@ -96,6 +154,7 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
       // Render into a dedicated child so the base class's `querySelector("svg")`
       // and ResizeObserver have a stable host — never the sibling <script>.
       surface.style.display = "block";
+      surface.className = "molplot-chart__surface";
       this.appendChild(surface);
       this.surface = surface;
 
@@ -108,7 +167,15 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
       const preset =
         (this.getAttribute("preset") as PresetName | null) ?? undefined;
       const theme = parseTheme(this.getAttribute("theme"));
-      this.chart = new RawChart(surface, { spec, preset, theme });
+      const interactive = parseInteractive(this.getAttribute("interactive"));
+      const aspectRatio = parseAspect(this.getAttribute("aspect"));
+      this.chart = new RawChart(surface, {
+        spec,
+        preset,
+        theme,
+        interactive,
+        aspectRatio,
+      });
       void this.chart.ready().then(() => {
         if (this.chart) this.dispatchEvent(new CustomEvent("molplot:ready"));
       });
@@ -119,6 +186,18 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
       this.chart = null;
       this.surface?.remove();
       this.surface = null;
+    }
+
+    private applySizing(): void {
+      const width = this.getAttribute("width");
+      const aspect = this.getAttribute("aspect");
+      if (width) this.style.setProperty("--molplot-width", width);
+      else this.style.removeProperty("--molplot-width");
+      if (aspect) {
+        this.style.setProperty("--molplot-aspect", aspect.replace(":", " / "));
+      } else {
+        this.style.removeProperty("--molplot-aspect");
+      }
     }
   }
 

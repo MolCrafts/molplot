@@ -47,7 +47,7 @@ on Vega-Lite so a single spec is portable between the browser and matplotlib.
 | Preset compiler | `scripts/build-presets.mjs` |
 | TS chart engine | `core/src/` |
 | TS tests | `core/tests/` |
-| Demo gallery | `page/src/` |
+| Web Component example | `example/src/` |
 | Python package | `python/src/molplot/` |
 | Python tests | `python/tests/` |
 | Docs | `docs/` |
@@ -57,9 +57,9 @@ on Vega-Lite so a single spec is portable between the browser and matplotlib.
 ```bash
 npm install
 npm run build:presets    # regenerate generated preset artifacts from presets/*.json
-npm run dev              # demo gallery at localhost:3000 (alias of dev:page)
+npm run dev              # Web Component example at localhost:3000
 npm run build:core       # rslib → core/dist (npm publish artifact)
-npm run typecheck        # core + page
+npm run typecheck        # core + example
 npm test                 # core (rstest, node) + python (pytest)
 npm run lint             # biome check --write
 cd python && pytest      # python only
@@ -67,14 +67,14 @@ cd python && pytest      # python only
 
 ## Monorepo structure
 
-npm workspaces: `["core", "page"]`. `python/` is a separate hatchling package
-(not an npm workspace). `page/` bundles `@molcrafts/molplot` from **source** via
+npm workspaces: `["core", "example"]`. `python/` is a separate hatchling package
+(not an npm workspace). `example/` bundles `@molcrafts/molplot` from **source** via
 an rsbuild alias; each package's `dist/` is for publish only.
 
 | Package | Path | Purpose |
 |---------|------|---------|
 | `@molcrafts/molplot` | `core/` | Vega-Lite chart classes + spec builders + theme |
-| `page` | `page/` | React 19 demo gallery |
+| `example` | `example/` | React 19 Web Component playground |
 | `molcrafts-molplot` (PyPI) | `python/` | scienceplots wrapper + VL→matplotlib renderer |
 
 ## Critical invariants

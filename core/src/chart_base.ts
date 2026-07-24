@@ -296,6 +296,14 @@ export abstract class VegaChart {
     return { width, height };
   }
 
+  /** Whether a ResizeObserver measurement requires a full re-embed. */
+  protected resizeChanged(
+    previous: { width: number; height: number },
+    next: { width: number; height: number },
+  ): boolean {
+    return previous.width !== next.width || previous.height !== next.height;
+  }
+
   private setupResizeObserver(): void {
     if (typeof ResizeObserver === "undefined") return;
     this.resizeObserver = new ResizeObserver(() => {
@@ -304,7 +312,13 @@ export abstract class VegaChart {
         this.resizeRaf = null;
         if (this.disposed) return;
         const { width, height } = this.dims();
-        if (width === this.lastW && height === this.lastH) return;
+        if (
+          !this.resizeChanged(
+            { width: this.lastW, height: this.lastH },
+            { width, height },
+          )
+        )
+          return;
         void this.render();
       });
     });

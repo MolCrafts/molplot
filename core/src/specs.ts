@@ -1,6 +1,6 @@
 import type { BarChartConfig, BarSeriesConfig } from "./bar_chart";
 import type { GanttChartConfig } from "./gantt_chart";
-import { type ChartTheme, vegaConfig } from "./theme";
+import { type ChartTheme, fontScaleForWidth, vegaConfig } from "./theme";
 import type { AxisConfig, LineChartConfig, ScatterChartConfig } from "./types";
 
 /**
@@ -83,7 +83,7 @@ export function zoomParamsOf(spec: VegaLiteSpec): ZoomParam[] {
  * Inert outside the browser: the matplotlib translator and vl-convert both
  * ignore `params` and render the initial view.
  */
-function interactionParams(channels: ZoomChannel[]): ZoomParam[] {
+export function interactionParams(channels: ZoomChannel[]): ZoomParam[] {
   return channels.map((channel) => ({
     name: ZOOM_PARAM[channel],
     select: {
@@ -127,6 +127,15 @@ function size(spec: SpecSize | undefined): {
   height: number;
 } {
   return { width: spec?.width ?? "container", height: spec?.height ?? 300 };
+}
+
+/** Preset config with type scaled to the host width when known. */
+function themedConfig(
+  theme: ChartTheme,
+  width: number | "container",
+): Record<string, unknown> {
+  const scale = typeof width === "number" ? fontScaleForWidth(width) : 1;
+  return vegaConfig(theme, scale);
 }
 
 /** LINE — one path per series, per-series width/opacity via nominal scales. */
@@ -211,7 +220,7 @@ export function lineSpec(
 
   return clean({
     $schema: VL_SCHEMA,
-    config: vegaConfig(theme),
+    config: themedConfig(theme, width),
     width,
     height,
     autosize: { type: "fit", contains: "padding" },
@@ -328,7 +337,7 @@ export function scatterSpec(
 
   return clean({
     $schema: VL_SCHEMA,
-    config: vegaConfig(theme),
+    config: themedConfig(theme, width),
     width,
     height,
     autosize: { type: "fit", contains: "padding" },
@@ -421,7 +430,7 @@ export function barSpec(
 
   return clean({
     $schema: VL_SCHEMA,
-    config: vegaConfig(theme),
+    config: themedConfig(theme, width),
     width,
     height,
     autosize: { type: "fit", contains: "padding" },
@@ -457,7 +466,7 @@ export function ganttSpec(
 
   return clean({
     $schema: VL_SCHEMA,
-    config: vegaConfig(theme),
+    config: themedConfig(theme, width),
     width,
     height,
     autosize: { type: "fit", contains: "padding" },

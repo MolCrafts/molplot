@@ -77,17 +77,47 @@ export function resolveTheme(mode: ThemeMode, presetName?: string): ChartTheme {
 }
 
 /**
+ * Paper design width (matches `view.continuousWidth`). At this width the
+ * preset type scale (≈9–12 px) is correct for a 3.5″ figure; wider web hosts
+ * need a scale factor so axis labels stay readable.
+ */
+export const MOLPLOT_DESIGN_WIDTH = 320;
+
+/**
+ * Scale factor for screen / docs hosts.
+ *
+ * Paper is ~9–12 px at {@link MOLPLOT_DESIGN_WIDTH}. Docs need much larger
+ * type (axis title / tick / annotation) — floor **3×** paper at design width,
+ * track host width up to **4.5×**. Fixed `fontSize` in a fence freezes size.
+ */
+export function fontScaleForWidth(width: number): number {
+  if (!Number.isFinite(width) || width <= 0) return 3;
+  const tracked = width / MOLPLOT_DESIGN_WIDTH;
+  return Math.min(4.5, Math.max(3, 3 * tracked));
+}
+
+/**
  * Build the Vega-Lite `config` object for a theme. This is the *single*
  * place the unified preset is injected into a spec — the exact counterpart of
  * the matplotlib rcParams the Python package applies, so a spec rendered in
  * the browser and the same spec rendered by scienceplots share palette, type
  * scale, and grid styling.
+ *
+ * @param fontScale - multiplies every type size (1 = paper preset). Web
+ *   hosts should pass {@link fontScaleForWidth} so labels track the chart size.
  */
-export function vegaConfig(theme: ChartTheme): Record<string, unknown> {
+export function vegaConfig(
+  theme: ChartTheme,
+  fontScale = 1,
+): Record<string, unknown> {
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  const px = (n: number) => Math.round(n * scale * 10) / 10;
+  // Modest outer pad — large pads + multi-legend + fixed box crushes the plot.
+  const pad = Math.max(6, Math.round(6 * scale));
   return {
     background: "transparent",
     font: theme.font.family,
-    padding: 4,
+    padding: { left: pad, right: pad, top: pad, bottom: pad },
     axis: {
       labelColor: theme.font.color,
       titleColor: theme.font.color,
@@ -95,29 +125,55 @@ export function vegaConfig(theme: ChartTheme): Record<string, unknown> {
       domainColor: theme.axis.tickColor,
       gridColor: theme.axis.gridColor,
       gridWidth: 0.5,
-      labelFontSize: theme.fontSize.tick,
-      titleFontSize: theme.fontSize.label,
+      labelFontSize: px(theme.fontSize.tick),
+      titleFontSize: px(theme.fontSize.label),
       labelFont: theme.font.family,
       titleFont: theme.font.family,
+      titleFontStyle: "normal",
+      labelFontStyle: "normal",
+      titlePadding: Math.round(8 * scale),
+      labelPadding: Math.round(4 * scale),
       grid: true,
-      tickSize: 4,
+      tickSize: Math.max(5, Math.round(4 * scale)),
+      labelLimit: Math.round(220 * scale),
+      titleLimit: Math.round(280 * scale),
+      labelOverlap: true,
+      labelFlush: true,
     },
     legend: {
       labelColor: theme.font.color,
       titleColor: theme.font.color,
-      labelFontSize: theme.fontSize.legend,
-      titleFontSize: theme.fontSize.legend,
+      labelFontSize: px(theme.fontSize.legend),
+      titleFontSize: px(theme.fontSize.legend),
       labelFont: theme.font.family,
       titleFont: theme.font.family,
       symbolType: "circle",
+      titleLimit: Math.round(160 * scale),
+      labelLimit: Math.round(120 * scale),
+      padding: Math.round(4 * scale),
+      offset: Math.round(6 * scale),
+      rowPadding: Math.round(2 * scale),
+      columnPadding: Math.round(4 * scale),
+      symbolSize: Math.round(48 * scale),
     },
     title: {
       color: theme.font.color,
-      fontSize: theme.fontSize.title,
+      fontSize: px(theme.fontSize.title),
       font: theme.font.family,
       fontWeight: 600,
+      fontStyle: "normal",
     },
-    view: { stroke: null, continuousWidth: 320, continuousHeight: 200 },
+    text: {
+      font: theme.font.family,
+      fontSize: px(theme.fontSize.label),
+      color: theme.font.color,
+      fontStyle: "normal",
+    },
+    view: {
+      stroke: null,
+      continuousWidth: MOLPLOT_DESIGN_WIDTH,
+      continuousHeight: 200,
+    },
     line: { strokeWidth: theme.geometry.lineWidth },
     point: { size: theme.geometry.markerSize * theme.geometry.markerSize },
     bar: { discreteBandSize: undefined },

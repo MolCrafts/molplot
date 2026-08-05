@@ -10,6 +10,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from typing import Any
 
+from ..annotations import take_annotations, with_annotations
 from ..preset import DEFAULT_PRESET, Mode
 from ..style import style as _style
 from .axes import apply_axes
@@ -38,7 +39,10 @@ def render(
     >>> spec = molplot.line_spec([{"id": "a", "x": [0, 1, 2], "y": [1, 3, 2]}])
     >>> fig, ax = molplot.render(spec)
     """
-    units = normalize(spec)
+    cleaned, annotations = take_annotations(spec)
+    if annotations:
+        cleaned = with_annotations(cleaned, annotations)
+    units = normalize(cleaned)
     ctx = _style(preset, mode) if apply_style else nullcontext()
     with ctx:
         fig, ax = _ensure_ax(ax)

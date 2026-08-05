@@ -37,6 +37,15 @@ chart.dispose();
 | `GanttChart` | time-spanning bars by status group | `update`, `onTaskClick` |
 | `RawChart` | render an arbitrary Vega-Lite spec | `update({ spec })` |
 
+## Web Component
+
+The self-registering `@molcrafts/molplot/elements` bundle provides a compact
+`<molplot-chart>` with a 4:3 default aspect ratio. Scale-bound pan and zoom are
+enabled by default for quantitative and temporal axes. Set
+`interactive="false"` to render a static chart. Low-specificity component CSS
+keeps the default width at or below `28rem` with compact padding, while allowing
+host styles to override every default.
+
 ## Spec builders
 
 Need the spec without a DOM (SSR, tests, shipping to Python)? Use the pure

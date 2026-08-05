@@ -9,6 +9,8 @@
       "!**/.rslib",
       "!**/out",
       "!**/site",
+      "!**/docs/assets",
+      "!**/.cache",
       "!**/*.css",
       "!**/presets/generated.ts"
     ]

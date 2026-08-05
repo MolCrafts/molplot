@@ -23,7 +23,7 @@ interface SceneItem {
 }
 
 /** Minimal shape of the vega-embed result we depend on. */
-interface EmbedResult {
+export interface EmbedResult {
   view: {
     data(name: string, values?: unknown[]): unknown;
     resize(): { run(): unknown };
@@ -31,10 +31,12 @@ interface EmbedResult {
     /** Top-left of the plot rectangle within the rendered element. */
     origin(): number[];
     signal(name: string): unknown;
+    /** Named scale: data value → plot-local pixel (undefined if missing). */
+    scale(name: string): ((value: number) => number) | undefined;
     scenegraph(): { root: SceneItem };
     addEventListener(
       type: string,
-      handler: (e: unknown, item: unknown) => void,
+      handler: (e: unknown, item?: unknown) => void,
     ): void;
     finalize(): void;
   };
@@ -215,20 +217,25 @@ export abstract class VegaChart {
     this.zoomable = zoomParamsOf(spec).length > 0;
     this.rendered = this.container.querySelector("svg");
     this.result = result;
+    this.afterRender(result);
   }
 
   /**
-   * Wheel over an axis zooms that axis alone. The spec's zoom params filter on
-   * flags this stamps, because a Vega event filter cannot read the `width` /
-   * `height` signals it would need to locate the pointer itself — see
-   * `ZOOM_EVENT_FLAG` in `specs.ts`.
+   * Hook after a successful embed. Default no-op.
+   * Annotations are VL layers (see `withAnnotations`), not a post-render overlay.
+   */
+  protected afterRender(_result: EmbedResult): void {}
+
+  /**
+   * Wheel interaction for scale zoom:
+   * - Axis gutter → that axis alone (classic molplot behaviour)
+   * - Plot interior → both continuous axes (embed-friendly; chat ScrollAreas
+   *   no longer need Shift+wheel for a first useful zoom)
+   * - Shift+wheel still works via the VL filter without flags
    *
-   * Bound once for the chart's life: the listener sits on `container`, which
-   * vega-embed renders into but never replaces.
-   *
-   * Passive, capture phase, and it never calls `preventDefault()`. Consuming
-   * the wheel is Vega's job and it only does so for a wheel its own selector
-   * matched, which is why an unmatched wheel still scrolls the enclosing panel.
+   * Bound once on `container` (vega-embed never replaces it). Non-passive so
+   * we can `preventDefault` and stop the host page/chat from scrolling when
+   * a zoom actually applies.
    */
   private bindAxisHoverZoom(): () => void {
     const onWheel = (event: Event): void => {
@@ -237,16 +244,33 @@ export abstract class VegaChart {
       const rect = this.rendered.getBoundingClientRect();
       const [originX, originY] = view.origin();
       const wheel = event as ZoomWheelEvent;
+      const width = view.signal("width") as number;
+      const height = view.signal("height") as number;
+      const localX = wheel.clientX - rect.left - originX;
+      const localY = wheel.clientY - rect.top - originY;
       const channel = axisChannelAt(
         axisBounds(view.scenegraph().root),
-        wheel.clientX - rect.left - originX,
-        wheel.clientY - rect.top - originY,
-        view.signal("width") as number,
-        view.signal("height") as number,
+        localX,
+        localY,
+        width,
+        height,
       );
-      if (channel) wheel[ZOOM_EVENT_FLAG[channel]] = true;
+      if (channel) {
+        wheel[ZOOM_EVENT_FLAG[channel]] = true;
+        wheel.preventDefault();
+        return;
+      }
+      // Plot interior: stamp both flags so ordinary wheel zooms the chart
+      // (otherwise only gutter hits or Shift+wheel did anything).
+      const inPlot =
+        localX >= 0 && localX <= width && localY >= 0 && localY <= height;
+      if (inPlot || wheel.shiftKey) {
+        wheel[ZOOM_EVENT_FLAG.x] = true;
+        wheel[ZOOM_EVENT_FLAG.y] = true;
+        wheel.preventDefault();
+      }
     };
-    const options = { capture: true, passive: true };
+    const options: AddEventListenerOptions = { capture: true, passive: false };
     this.container.addEventListener("wheel", onWheel, options);
     return () => this.container.removeEventListener("wheel", onWheel, options);
   }
@@ -296,6 +320,14 @@ export abstract class VegaChart {
     return { width, height };
   }
 
+  /** Whether a ResizeObserver measurement requires a full re-embed. */
+  protected resizeChanged(
+    previous: { width: number; height: number },
+    next: { width: number; height: number },
+  ): boolean {
+    return previous.width !== next.width || previous.height !== next.height;
+  }
+
   private setupResizeObserver(): void {
     if (typeof ResizeObserver === "undefined") return;
     this.resizeObserver = new ResizeObserver(() => {
@@ -304,7 +336,13 @@ export abstract class VegaChart {
         this.resizeRaf = null;
         if (this.disposed) return;
         const { width, height } = this.dims();
-        if (width === this.lastW && height === this.lastH) return;
+        if (
+          !this.resizeChanged(
+            { width: this.lastW, height: this.lastH },
+            { width, height },
+          )
+        )
+          return;
         void this.render();
       });
     });

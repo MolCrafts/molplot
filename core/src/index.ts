@@ -1,5 +1,18 @@
 // Chart classes (imperative, framework-agnostic) ---------------------------
 
+// Annotations (scale bar, arrows) -----------------------------------------
+export type {
+  Annotation,
+  ArrowAnnotation,
+  ScaleBarAnnotation,
+} from "./annotations";
+export {
+  annotationLayers,
+  arrow,
+  scaleBar,
+  takeAnnotations,
+  withAnnotations,
+} from "./annotations";
 export type {
   BarChartConfig,
   BarClickEvent,
@@ -8,10 +21,7 @@ export type {
   BarSeriesConfig,
 } from "./bar_chart";
 export { BarChart } from "./bar_chart";
-// Web Component — register `<molplot-chart>` in the browser. These are plain
-// functions that touch the DOM only when called, so importing the library stays
-// side-effect-free and SSR-safe (no top-level `class extends HTMLElement`). The
-// self-registering browser bundle is the `./elements` subpath.
+// Web Component — register `<molplot-chart>` in the browser.
 export { defineMolplotChart, parseSpec } from "./element";
 export type {
   GanttChartConfig,
@@ -32,7 +42,7 @@ export {
 export type { RawChartConfig } from "./raw_chart";
 export { RawChart } from "./raw_chart";
 export { ScatterChart } from "./scatter_chart";
-// Vega-Lite spec builders — the portable intermediate language --------------
+// Vega-Lite spec builders -------------------------------------------------
 export {
   barSpec,
   ganttSpec,
@@ -47,6 +57,8 @@ export {
   CHART_DEFAULT_COLOR,
   CHART_PALETTE,
   type ChartTheme,
+  fontScaleForWidth,
+  MOLPLOT_DESIGN_WIDTH,
   resolveTheme,
   vegaConfig,
 } from "./theme";

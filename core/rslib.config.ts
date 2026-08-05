@@ -7,6 +7,7 @@ export default defineConfig({
       bundle: false,
       dts: true,
       source: {
+        // Sources only (`tests/` lives outside; do not put `*.test.ts` under src/).
         entry: { index: "./src/**" },
       },
       output: {

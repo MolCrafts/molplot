@@ -17,6 +17,8 @@ build/
 
 # Docs
 site/
+# Staged from core/dist for local zensical; rebuild stages fresh.
+docs/assets/molplot/
 
 # OS / editors
 .DS_Store

@@ -261,8 +261,9 @@ describe("RawChart (the element's renderer)", () => {
       },
     });
     await chart.ready();
-    const layers = (fake.specs[0] as { layer: { params?: { name: string }[] }[] })
-      .layer;
+    const layers = (
+      fake.specs[0] as { layer: { params?: { name: string }[] }[] }
+    ).layer;
     expect(layers[0].params?.map((p) => p.name)).toEqual(["zoomX", "zoomY"]);
     expect((fake.specs[0] as { params?: unknown }).params).toBeUndefined();
     chart.dispose();

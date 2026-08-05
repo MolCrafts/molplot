@@ -7,10 +7,11 @@ export type {
   ScaleBarAnnotation,
 } from "./annotations";
 export {
+  annotationLayers,
   arrow,
-  drawAnnotations,
   scaleBar,
   takeAnnotations,
+  withAnnotations,
 } from "./annotations";
 export type {
   BarChartConfig,

@@ -221,8 +221,8 @@ export abstract class VegaChart {
   }
 
   /**
-   * Hook after a successful embed (subclasses: annotation overlays, etc.).
-   * Default no-op.
+   * Hook after a successful embed. Default no-op.
+   * Annotations are VL layers (see `withAnnotations`), not a post-render overlay.
    */
   protected afterRender(_result: EmbedResult): void {}
 

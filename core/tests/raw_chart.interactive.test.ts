@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "@rstest/core";
-import { interactionParams } from "./specs";
+import { interactionParams } from "../src/specs";
 
 type ZoomChannel = "x" | "y";
 
@@ -45,13 +45,14 @@ function mergeZoomParams(
 }
 
 /** Where zoom params should be placed for a given spec shape. */
-function zoomPlacement(spec: Record<string, unknown>): "top" | "layer0" | "none" {
+function zoomPlacement(
+  spec: Record<string, unknown>,
+): "top" | "layer0" | "none" {
   const channels = continuousChannels(spec);
   if (channels.length === 0) return "none";
   const layers = Array.isArray(spec.layer) ? spec.layer : null;
-  const topEncoding =
-    spec.encoding && typeof spec.encoding === "object" ? spec.encoding : null;
-  if (layers && layers.length > 0 && topEncoding) return "top";
+  // Multi-layer always uses layer0 — top-level params duplicate VL selection
+  // signals when annotation (or any extra) layers are present.
   if (layers && layers.length > 0) return "layer0";
   return "top";
 }
@@ -89,7 +90,7 @@ describe("RawChart interactive injection", () => {
     expect(channels).toEqual(["x", "y"]);
   });
 
-  it("places zoom params at top when encoding is shared on a layered chart", () => {
+  it("places zoom params on layer0 when encoding is shared on a layered chart", () => {
     expect(
       zoomPlacement({
         encoding: {
@@ -98,7 +99,7 @@ describe("RawChart interactive injection", () => {
         },
         layer: [{ encoding: { x: { field: "x" }, y: { field: "y" } } }],
       }),
-    ).toBe("top");
+    ).toBe("layer0");
   });
 
   it("places zoom params on layer0 when only unit layers have encoding", () => {
@@ -109,6 +110,27 @@ describe("RawChart interactive injection", () => {
             encoding: {
               x: { field: "N", type: "quantitative" },
               y: { field: "Rg", type: "quantitative" },
+            },
+          },
+        ],
+      }),
+    ).toBe("layer0");
+  });
+
+  it("places zoom params on layer0 when annotation layers are present", () => {
+    expect(
+      zoomPlacement({
+        encoding: {
+          x: { type: "quantitative" },
+          y: { type: "quantitative" },
+        },
+        layer: [
+          { encoding: { x: { field: "x" }, y: { field: "y" } } },
+          {
+            mark: "rule",
+            encoding: {
+              x: { field: "x", type: "quantitative" },
+              y: { field: "y", type: "quantitative" },
             },
           },
         ],

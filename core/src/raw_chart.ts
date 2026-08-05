@@ -1,9 +1,5 @@
-import {
-  type Annotation,
-  drawAnnotations,
-  takeAnnotations,
-} from "./annotations";
-import { type EmbedResult, VegaChart } from "./chart_base";
+import { takeAnnotations, withAnnotations } from "./annotations";
+import { VegaChart } from "./chart_base";
 import type { PresetName } from "./preset";
 import {
   interactionParams,
@@ -14,9 +10,8 @@ import { type ChartTheme, fontScaleForWidth, vegaConfig } from "./theme";
 import type { ThemeMode } from "./types";
 
 /**
- * Escape hatch: render an arbitrary Vega-Lite spec. Optional top-level
- * `annotations` (molplot extension) are stripped before embed and painted
- * as a screen-space SVG overlay after layout / on pan-zoom.
+ * Render a Vega-Lite spec. Optional top-level `annotations` (molplot
+ * extension) expand into ordinary VL layers so they pan/zoom with the chart.
  */
 export interface RawChartConfig {
   /** A Vega-Lite top-level spec (plus optional `annotations`). */
@@ -33,7 +28,6 @@ export class RawChart extends VegaChart {
   private spec: VegaLiteSpec = {};
   private interactive = true;
   private aspectRatio = 4 / 3;
-  private annotations: Annotation[] = [];
 
   constructor(container: HTMLElement, config: RawChartConfig) {
     super(container, config.theme ?? "auto", config.preset);
@@ -46,11 +40,7 @@ export class RawChart extends VegaChart {
   }
 
   private applyConfig(config: RawChartConfig): void {
-    const taken = takeAnnotations({
-      ...((config.spec ?? {}) as Record<string, unknown>),
-    });
-    this.spec = taken.spec as VegaLiteSpec;
-    this.annotations = taken.annotations;
+    this.spec = (config.spec ?? {}) as VegaLiteSpec;
     this.interactive = config.interactive ?? true;
     this.aspectRatio = config.aspectRatio ?? 4 / 3;
   }
@@ -67,40 +57,15 @@ export class RawChart extends VegaChart {
     return super.resizeChanged(previous, next);
   }
 
-  /** Paint scale bars / arrows after embed and whenever scales move. */
-  protected afterRender(result: EmbedResult): void {
-    this.paintAnnotations(result);
-    // Redraw overlay when the user pans/zooms (scales change).
-    const view = result.view;
-    const redraw = (): void => {
-      requestAnimationFrame(() => this.paintAnnotations(result));
-    };
-    view.addEventListener("wheel", redraw);
-    view.addEventListener("mousedown", () => {
-      const move = (): void => redraw();
-      const up = (): void => {
-        window.removeEventListener("mousemove", move);
-        window.removeEventListener("mouseup", up);
-        redraw();
-      };
-      window.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", up);
-    });
-    view.addEventListener("dblclick", redraw);
-  }
-
-  private paintAnnotations(result: EmbedResult): void {
-    if (!this.annotations.length) return;
-    const svg = this.container.querySelector("svg");
-    if (!svg) return;
-    drawAnnotations(svg, result.view, this.annotations);
-  }
-
   protected buildSpec(
     theme: ChartTheme,
     sizeHint: { width: number; height: number },
   ): VegaLiteSpec {
-    const spec = { ...(this.spec ?? {}) } as VegaLiteSpec;
+    // Expand annotations → VL layers (scenegraph), then inject zoom params.
+    const taken = takeAnnotations({
+      ...((this.spec ?? {}) as Record<string, unknown>),
+    });
+    const spec = withAnnotations(taken.spec as VegaLiteSpec, taken.annotations);
     const channels = this.interactive ? continuousChannels(spec) : [];
     const derivedHeight = Math.max(
       1,
@@ -135,21 +100,13 @@ export class RawChart extends VegaChart {
     const layers = Array.isArray(spec.layer)
       ? (spec.layer as Record<string, unknown>[])
       : null;
-    const topEncoding =
-      spec.encoding && typeof spec.encoding === "object"
-        ? (spec.encoding as Record<string, unknown>)
-        : null;
 
-    // Shared top-level encoding (docs layered charts): bind:scales must be
-    // top-level or pan/zoom never attaches to the shared axes.
-    if (layers && layers.length > 0 && topEncoding) {
-      return {
-        ...base,
-        params: mergeZoomParams(spec.params, zoom),
-      };
-    }
-
-    // Encoding only on unit layers: params live on the first unit layer.
+    // Layered charts (incl. annotation rule/text layers): put zoom params on
+    // the first unit layer only. Top-level `params` + multiple layers makes
+    // Vega-Lite emit duplicate selection signals (`zoomX_x`, …); vega.parse
+    // then throws and the whole chart fails to render. Layer-0 params still
+    // bind shared x/y scales (domainRaw), so pan/zoom and annotation layers
+    // move together.
     if (layers && layers.length > 0) {
       const nextLayers = layers.map((layer, i) => {
         if (i !== 0) return layer;

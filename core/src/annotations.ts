@@ -1,46 +1,41 @@
 /**
- * Chart annotations — matplotlib-style artists drawn in **screen space**.
+ * Chart annotations as **Vega-Lite layers** (not a separate overlay).
  *
- * Vega-Lite has no `annotate` / `arrowstyle='|-|'`. Geometry that must stay
- * visually perpendicular (log axes, non-square panels) is computed at render
- * time from Vega's scale functions, not pre-baked into VL layers.
+ * Vega-Lite has no `annotate` / `arrowstyle='|-|'` and no official plugin
+ * system for annotations (research prototypes only). We expand a small
+ * molplot extension (`annotations: [...]`) into ordinary `rule` / `text`
+ * layers so they live in the VL scenegraph and **pan/zoom with the chart**.
  *
- * - {@link scaleBar}: complete `|———|` (spine + both caps + label)
- * - {@link arrow}: shaft + tip + optional label
- *
- * Put an `annotations` array on the RawChart / fence payload. RawChart strips
- * it before embed and paints an SVG overlay after layout / on pan-zoom.
+ * Caps are axis-aligned ticks in data space (VL-native). Perfect screen-space
+ * right angles on log axes would need post-layout pixel math and an overlay
+ * that is hard to keep in sync with `bind: scales`.
  */
+
+import type { VegaLiteSpec } from "./specs";
 
 export type ScaleBarAnnotation = {
   kind: "scaleBar";
-  /** Start in data coordinates (on the curve for `along`). */
+  /** Start (data coords). For `along`, a point on the curve. */
   x: number;
   y: number;
-  /** End in data coordinates (with `x2`/`y2` → along-curve bar). */
   x2?: number;
   y2?: number;
-  /** Axis-aligned length when only one end is given. */
   length?: number;
   label?: string;
   color?: string;
-  /** Stroke width in CSS px. Default 1.8. */
   strokeWidth?: number;
   /**
-   * `along` (default when both ends set): bar parallel to (x,y)→(x2,y2).
-   * `horizontal` / `vertical`: axis-aligned size bar.
+   * `along` — chord (x,y)→(x2,y2), optionally shifted in data space.
+   * `horizontal` / `vertical` — axis-aligned size bar.
    */
   orientation?: "horizontal" | "vertical" | "along";
   /**
-   * Screen-space offset of an `along` bar from the chord, as a fraction of
-   * the shorter plot side (default 0.05). Keeps the bar off the curve.
+   * Multiplicative y-shift for `along` bars (default 1.4) so the bar sits
+   * above the curve on log–y plots without leaving the VL scenegraph.
    */
-  offset?: number;
-  /**
-   * End-cap half-length in screen px (default 8).
-   */
-  capSize?: number;
-  /** Label font size in px (default 14). */
+  yOffset?: number;
+  /** End-cap half-length as a fraction of local y (log-friendly). Default 0.25. */
+  capFrac?: number;
   fontSize?: number;
 };
 
@@ -53,48 +48,37 @@ export type ArrowAnnotation = {
   label?: string;
   color?: string;
   strokeWidth?: number;
-  /** Tip size in px (default 8). */
-  tipSize?: number;
   fontSize?: number;
 };
 
 export type Annotation = ScaleBarAnnotation | ArrowAnnotation;
 
-/** Factory: one complete `|———|`. */
 export function scaleBar(
   partial: Omit<ScaleBarAnnotation, "kind">,
 ): ScaleBarAnnotation {
   const hasEnds = partial.x2 != null && partial.y2 != null;
   return {
     color: "#18432b",
-    strokeWidth: 1.8,
+    strokeWidth: 2,
     orientation: hasEnds ? "along" : "horizontal",
-    offset: 0.05,
-    capSize: 8,
+    yOffset: 1.4,
+    capFrac: 0.25,
     fontSize: 14,
     ...partial,
     kind: "scaleBar",
   };
 }
 
-/** Factory: one complete arrow. */
-export function arrow(
-  partial: Omit<ArrowAnnotation, "kind">,
-): ArrowAnnotation {
+export function arrow(partial: Omit<ArrowAnnotation, "kind">): ArrowAnnotation {
   return {
     color: "#18432b",
     strokeWidth: 1.6,
-    tipSize: 8,
     fontSize: 14,
     ...partial,
     kind: "arrow",
   };
 }
 
-/**
- * Pull top-level `annotations` off a payload (ignored by Vega-Lite).
- * Returns a clean VL-shaped object plus the annotation list.
- */
 export function takeAnnotations(spec: Record<string, unknown>): {
   spec: Record<string, unknown>;
   annotations: Annotation[];
@@ -102,7 +86,7 @@ export function takeAnnotations(spec: Record<string, unknown>): {
   const raw = spec.annotations;
   if (!Array.isArray(raw) || raw.length === 0) {
     if ("annotations" in spec) {
-      const { annotations: _drop, ...rest } = spec;
+      const { annotations: _d, ...rest } = spec;
       return { spec: rest, annotations: [] };
     }
     return { spec, annotations: [] };
@@ -114,227 +98,288 @@ export function takeAnnotations(spec: Record<string, unknown>): {
       ((a as Annotation).kind === "scaleBar" ||
         (a as Annotation).kind === "arrow"),
   );
-  const { annotations: _drop, ...rest } = spec;
+  const { annotations: _d, ...rest } = spec;
   return { spec: rest, annotations };
 }
 
-/** Minimal view surface needed to project data → SVG pixels. */
-export interface AnnotationView {
-  /** Vega scale: data value → plot-local pixel. */
-  scale(name: string): ((v: number) => number) | undefined;
-  /** Top-left of the plot rectangle inside the SVG. */
-  origin(): number[];
-  signal(name: string): unknown;
-}
-
-const SVG_NS = "http://www.w3.org/2000/svg";
-const OVERLAY_ATTR = "data-molplot-annotations";
-
-function lineEl(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-  color: string,
-  width: number,
-): SVGLineElement {
-  const el = document.createElementNS(SVG_NS, "line");
-  el.setAttribute("x1", String(x1));
-  el.setAttribute("y1", String(y1));
-  el.setAttribute("x2", String(x2));
-  el.setAttribute("y2", String(y2));
-  el.setAttribute("stroke", color);
-  el.setAttribute("stroke-width", String(width));
-  el.setAttribute("stroke-linecap", "butt");
-  return el;
-}
-
-function textEl(
-  x: number,
-  y: number,
-  text: string,
-  color: string,
-  fontSize: number,
-): SVGTextElement {
-  const el = document.createElementNS(SVG_NS, "text");
-  el.setAttribute("x", String(x));
-  el.setAttribute("y", String(y));
-  el.setAttribute("fill", color);
-  el.setAttribute("font-size", String(fontSize));
-  el.setAttribute(
-    "font-family",
-    "Times New Roman, Times, STIX Two Text, STIXGeneral, serif",
-  );
-  el.setAttribute("font-style", "normal");
-  el.setAttribute("text-anchor", "middle");
-  el.setAttribute("dominant-baseline", "middle");
-  el.textContent = text;
-  return el;
+function clean(layer: Record<string, unknown>): VegaLiteSpec {
+  for (const k of Object.keys(layer)) {
+    if (layer[k] === undefined) delete layer[k];
+  }
+  return layer as VegaLiteSpec;
 }
 
 /**
- * Paint annotations into `svg` using the live Vega scales (screen-correct).
- * Idempotent: replaces any previous overlay group. `pointer-events: none`
- * so pan/zoom on the plot still works.
+ * Expand annotations into VL layers (rule / text). These join the chart
+ * scenegraph so pan/zoom applies automatically.
  */
-export function drawAnnotations(
-  svg: SVGSVGElement,
-  view: AnnotationView,
-  annotations: Annotation[],
-): void {
-  svg.querySelector(`[${OVERLAY_ATTR}]`)?.remove();
-  if (!annotations.length) return;
-
-  const xScale = view.scale("x");
-  const yScale = view.scale("y");
-  if (!xScale || !yScale) return;
-
-  const [ox, oy] = view.origin();
-  const width = Number(view.signal("width")) || 0;
-  const height = Number(view.signal("height")) || 0;
-  if (width <= 0 || height <= 0) return;
-
-  const toPx = (x: number, y: number): [number, number] => [
-    ox + xScale(x),
-    oy + yScale(y),
-  ];
-
-  const g = document.createElementNS(SVG_NS, "g");
-  g.setAttribute(OVERLAY_ATTR, "");
-  g.setAttribute("style", "pointer-events: none");
-
+export function annotationLayers(annotations: Annotation[]): VegaLiteSpec[] {
+  const out: VegaLiteSpec[] = [];
   for (const a of annotations) {
-    if (a.kind === "scaleBar") drawScaleBar(g, a, toPx, width, height);
-    else if (a.kind === "arrow") drawArrow(g, a, toPx);
+    if (a.kind === "scaleBar") out.push(...scaleBarLayers(a));
+    else if (a.kind === "arrow") out.push(...arrowLayers(a));
   }
-
-  svg.appendChild(g);
+  return out;
 }
 
-function drawScaleBar(
-  g: SVGGElement,
-  a: ScaleBarAnnotation,
-  toPx: (x: number, y: number) => [number, number],
-  plotW: number,
-  plotH: number,
-): void {
+/** Merge annotation layers into a unit or layered VL spec. */
+export function withAnnotations(
+  spec: VegaLiteSpec,
+  annotations: Annotation[] | undefined | null,
+): VegaLiteSpec {
+  if (!annotations?.length) return spec;
+  const extra = annotationLayers(annotations);
+  if (!extra.length) return spec;
+
+  if (Array.isArray(spec.layer)) {
+    return { ...spec, layer: [...(spec.layer as VegaLiteSpec[]), ...extra] };
+  }
+  if (spec.mark !== undefined || spec.encoding !== undefined) {
+    const { mark, encoding, data, transform, params, ...rest } = spec as Record<
+      string,
+      unknown
+    >;
+    const base: VegaLiteSpec = {};
+    if (data !== undefined) base.data = data;
+    if (mark !== undefined) base.mark = mark;
+    if (encoding !== undefined) base.encoding = encoding;
+    if (transform !== undefined) base.transform = transform;
+    if (params !== undefined) base.params = params;
+    return { ...rest, layer: [base, ...extra] } as VegaLiteSpec;
+  }
+  return { ...spec, layer: extra };
+}
+
+function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
   const color = a.color ?? "#18432b";
-  const sw = a.strokeWidth ?? 1.8;
-  const capHalf = a.capSize ?? 8;
+  const sw = a.strokeWidth ?? 2;
   const fontSize = a.fontSize ?? 14;
   const orient =
-    a.orientation ??
-    (a.x2 != null && a.y2 != null ? "along" : "horizontal");
-
-  let x0 = a.x;
-  let y0 = a.y;
-  let x1: number;
-  let y1: number;
+    a.orientation ?? (a.x2 != null && a.y2 != null ? "along" : "horizontal");
+  const layers: VegaLiteSpec[] = [];
+  const q = { type: "quantitative" as const };
 
   if (orient === "along" && a.x2 != null && a.y2 != null) {
-    x1 = a.x2;
-    y1 = a.y2;
-  } else if (orient === "vertical") {
-    x1 = a.x;
-    y1 = a.y2 ?? a.y + (a.length ?? 0);
-  } else {
-    x1 = a.x2 ?? a.x + (a.length ?? 0);
-    y1 = a.y;
+    // Lift the whole bar above the curve in data y (works on linear & log-y).
+    const yMul = a.yOffset ?? 1.4;
+    const x0 = a.x;
+    const x1 = a.x2;
+    const y0 = a.y * yMul;
+    const y1 = a.y2 * yMul;
+    const capFrac = a.capFrac ?? 0.25;
+    // Vertical caps in data space (VL-native; pan/zoom with scales).
+    const c0lo = y0 / (1 + capFrac);
+    const c0hi = y0 * (1 + capFrac);
+    const c1lo = y1 / (1 + capFrac);
+    const c1hi = y1 * (1 + capFrac);
+    const midX = Math.sqrt(x0 * x1); // geometric mid for log-x
+    const midY = Math.sqrt(y0 * y1) * (1 + capFrac * 0.5);
+
+    layers.push(
+      clean({
+        data: { values: [{ x: x0, y: y0, x2: x1, y2: y1 }] },
+        mark: { type: "rule", strokeWidth: sw, color, strokeCap: "butt" },
+        encoding: {
+          x: { field: "x", ...q },
+          y: { field: "y", ...q },
+          x2: { field: "x2" },
+          y2: { field: "y2" },
+        },
+      }),
+      clean({
+        data: {
+          values: [
+            { x: x0, y: c0lo, y2: c0hi },
+            { x: x1, y: c1lo, y2: c1hi },
+          ],
+        },
+        mark: { type: "rule", strokeWidth: sw, color },
+        encoding: {
+          x: { field: "x", ...q },
+          y: { field: "y", ...q },
+          y2: { field: "y2" },
+        },
+      }),
+    );
+    if (a.label) {
+      layers.push(
+        clean({
+          data: { values: [{ x: midX, y: midY, label: a.label }] },
+          mark: {
+            type: "text",
+            fontSize,
+            font: "Times New Roman, Times, STIX Two Text, serif",
+            fontStyle: "normal",
+            color,
+            align: "center",
+            baseline: "bottom",
+          },
+          encoding: {
+            x: { field: "x", ...q },
+            y: { field: "y", ...q },
+            text: { field: "label", type: "nominal" },
+          },
+        }),
+      );
+    }
+    return layers;
   }
 
-  let [px0, py0] = toPx(x0, y0);
-  let [px1, py1] = toPx(x1, y1);
-
-  // Screen-space direction along the bar
-  let dx = px1 - px0;
-  let dy = py1 - py0;
-  const len = Math.hypot(dx, dy) || 1;
-  const tx = dx / len;
-  const ty = dy / len;
-  // Screen-space normal (rotate 90°)
-  let nx = -ty;
-  let ny = tx;
-  // Prefer normal that points "up" on screen (smaller y in SVG)
-  if (ny > 0) {
-    nx = -nx;
-    ny = -ny;
+  if (orient === "vertical") {
+    const y1 = a.y2 ?? a.y + (a.length ?? 0);
+    const mid = (a.y + y1) / 2;
+    const tick = Math.abs(y1 - a.y) * 0.08 || a.x * 0.05;
+    layers.push(
+      clean({
+        data: { values: [{ x: a.x, y: a.y, y2: y1 }] },
+        mark: { type: "rule", strokeWidth: sw, color },
+        encoding: {
+          x: { field: "x", ...q },
+          y: { field: "y", ...q },
+          y2: { field: "y2" },
+        },
+      }),
+      clean({
+        data: {
+          values: [
+            { x: a.x - tick, x2: a.x + tick, y: a.y },
+            { x: a.x - tick, x2: a.x + tick, y: y1 },
+          ],
+        },
+        mark: { type: "rule", strokeWidth: sw, color },
+        encoding: {
+          x: { field: "x", ...q },
+          x2: { field: "x2" },
+          y: { field: "y", ...q },
+        },
+      }),
+    );
+    if (a.label) {
+      layers.push(
+        clean({
+          data: { values: [{ x: a.x, y: mid, label: a.label }] },
+          mark: {
+            type: "text",
+            dx: 10,
+            fontSize,
+            font: "Times New Roman, Times, serif",
+            color,
+            align: "left",
+            baseline: "middle",
+          },
+          encoding: {
+            x: { field: "x", ...q },
+            y: { field: "y", ...q },
+            text: { field: "label", type: "nominal" },
+          },
+        }),
+      );
+    }
+    return layers;
   }
 
-  if (orient === "along") {
-    const offsetPx =
-      (a.offset ?? 0.05) * Math.min(plotW, plotH);
-    px0 += nx * offsetPx;
-    py0 += ny * offsetPx;
-    px1 += nx * offsetPx;
-    py1 += ny * offsetPx;
-  }
-
-  // Spine
-  g.appendChild(lineEl(px0, py0, px1, py1, color, sw));
-  // Caps ⊥ spine in screen space
-  g.appendChild(
-    lineEl(
-      px0 + nx * capHalf,
-      py0 + ny * capHalf,
-      px0 - nx * capHalf,
-      py0 - ny * capHalf,
-      color,
-      sw,
-    ),
+  // horizontal
+  const x1 = a.x2 ?? a.x + (a.length ?? 0);
+  const mid = (a.x + x1) / 2;
+  const capFrac = a.capFrac ?? 0.25;
+  const yLo = a.y / (1 + capFrac);
+  const yHi = a.y * (1 + capFrac);
+  layers.push(
+    clean({
+      data: { values: [{ x: a.x, x2: x1, y: a.y }] },
+      mark: { type: "rule", strokeWidth: sw, color, strokeCap: "butt" },
+      encoding: {
+        x: { field: "x", ...q },
+        x2: { field: "x2" },
+        y: { field: "y", ...q },
+      },
+    }),
+    clean({
+      data: {
+        values: [
+          { x: a.x, y: yLo, y2: yHi },
+          { x: x1, y: yLo, y2: yHi },
+        ],
+      },
+      mark: { type: "rule", strokeWidth: sw, color },
+      encoding: {
+        x: { field: "x", ...q },
+        y: { field: "y", ...q },
+        y2: { field: "y2" },
+      },
+    }),
   );
-  g.appendChild(
-    lineEl(
-      px1 + nx * capHalf,
-      py1 + ny * capHalf,
-      px1 - nx * capHalf,
-      py1 - ny * capHalf,
-      color,
-      sw,
-    ),
-  );
-
   if (a.label) {
-    const mx = (px0 + px1) / 2 + nx * (capHalf + fontSize * 0.7);
-    const my = (py0 + py1) / 2 + ny * (capHalf + fontSize * 0.7);
-    g.appendChild(textEl(mx, my, a.label, color, fontSize));
-  }
-}
-
-function drawArrow(
-  g: SVGGElement,
-  a: ArrowAnnotation,
-  toPx: (x: number, y: number) => [number, number],
-): void {
-  const color = a.color ?? "#18432b";
-  const sw = a.strokeWidth ?? 1.6;
-  const tip = a.tipSize ?? 8;
-  const [px0, py0] = toPx(a.x, a.y);
-  const [px1, py1] = toPx(a.x2, a.y2);
-  g.appendChild(lineEl(px0, py0, px1, py1, color, sw));
-
-  const dx = px1 - px0;
-  const dy = py1 - py0;
-  const len = Math.hypot(dx, dy) || 1;
-  const ux = dx / len;
-  const uy = dy / len;
-  // Arrowhead as two short lines
-  const hx = -ux * tip + -uy * tip * 0.5;
-  const hy = -uy * tip + ux * tip * 0.5;
-  const hx2 = -ux * tip + uy * tip * 0.5;
-  const hy2 = -uy * tip + -ux * tip * 0.5;
-  g.appendChild(lineEl(px1, py1, px1 + hx, py1 + hy, color, sw));
-  g.appendChild(lineEl(px1, py1, px1 + hx2, py1 + hy2, color, sw));
-
-  if (a.label) {
-    const fontSize = a.fontSize ?? 14;
-    g.appendChild(
-      textEl(
-        (px0 + px1) / 2,
-        (py0 + py1) / 2 - fontSize,
-        a.label,
-        color,
-        fontSize,
-      ),
+    layers.push(
+      clean({
+        data: { values: [{ x: mid, y: yHi, label: a.label }] },
+        mark: {
+          type: "text",
+          dy: -4,
+          fontSize,
+          font: "Times New Roman, Times, serif",
+          color,
+          align: "center",
+          baseline: "bottom",
+        },
+        encoding: {
+          x: { field: "x", ...q },
+          y: { field: "y", ...q },
+          text: { field: "label", type: "nominal" },
+        },
+      }),
     );
   }
+  return layers;
+}
+
+function arrowLayers(a: ArrowAnnotation): VegaLiteSpec[] {
+  const color = a.color ?? "#18432b";
+  const sw = a.strokeWidth ?? 1.6;
+  const fontSize = a.fontSize ?? 14;
+  const q = { type: "quantitative" as const };
+  const layers: VegaLiteSpec[] = [
+    clean({
+      data: {
+        values: [{ x: a.x, y: a.y, x2: a.x2, y2: a.y2 }],
+      },
+      mark: { type: "rule", strokeWidth: sw, color, strokeCap: "round" },
+      encoding: {
+        x: { field: "x", ...q },
+        y: { field: "y", ...q },
+        x2: { field: "x2" },
+        y2: { field: "y2" },
+      },
+    }),
+  ];
+  if (a.label) {
+    layers.push(
+      clean({
+        data: {
+          values: [
+            {
+              x: (a.x + a.x2) / 2,
+              y: (a.y + a.y2) / 2,
+              label: a.label,
+            },
+          ],
+        },
+        mark: {
+          type: "text",
+          dy: -8,
+          fontSize,
+          font: "Times New Roman, Times, serif",
+          color,
+          align: "center",
+          baseline: "bottom",
+        },
+        encoding: {
+          x: { field: "x", ...q },
+          y: { field: "y", ...q },
+          text: { field: "label", type: "nominal" },
+        },
+      }),
+    );
+  }
+  return layers;
 }

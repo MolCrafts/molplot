@@ -28,11 +28,14 @@ class ScaleBarAnnotation(TypedDict, total=False):
     x: float
     y: float
     length: float
+    x2: float
+    y2: float
     label: str
     color: str
     strokeWidth: float
     orientation: Literal["horizontal", "vertical"]
     tick: float
+    tickRatio: float
 
 
 class ArrowAnnotation(TypedDict, total=False):
@@ -50,20 +53,29 @@ class ArrowAnnotation(TypedDict, total=False):
 Annotation = ScaleBarAnnotation | ArrowAnnotation
 
 
+_SERIF = "Times New Roman, Times, STIX Two Text, STIXGeneral, serif"
+
+
 def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
     color = a.get("color") or "#14271d"
     sw = a.get("strokeWidth") or 1.6
     horizontal = (a.get("orientation") or "horizontal") == "horizontal"
-    length = float(a["length"])
+    length = float(a["length"]) if a.get("length") is not None else 0.0
     tick = a.get("tick")
     if tick is None:
         tick = abs(length) * 0.08 if length else 0.05
+    tick_ratio = a.get("tickRatio")
     x, y = float(a["x"]), float(a["y"])
     layers: list[dict[str, Any]] = []
 
     if horizontal:
-        x0, x1 = x, x + length
+        x0 = x
+        x1 = float(a["x2"]) if a.get("x2") is not None else x + length
         mid = (x0 + x1) / 2
+        if tick_ratio is not None:
+            y_lo, y_hi = y / float(tick_ratio), y * float(tick_ratio)
+        else:
+            y_lo, y_hi = y - tick, y + tick
         layers.append(
             {
                 "data": {"values": [{"x": x0, "x2": x1, "y": y}]},
@@ -79,8 +91,8 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "data": {
                     "values": [
-                        {"x": x0, "y": y - tick, "y2": y + tick},
-                        {"x": x1, "y": y - tick, "y2": y + tick},
+                        {"x": x0, "y": y_lo, "y2": y_hi},
+                        {"x": x1, "y": y_lo, "y2": y_hi},
                     ]
                 },
                 "mark": {"type": "rule", "strokeWidth": sw, "color": color},
@@ -98,7 +110,9 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "mark": {
                         "type": "text",
                         "dy": 12,
-                        "fontSize": 11,
+                        "fontSize": 12,
+                        "font": _SERIF,
+                        "fontStyle": "italic",
                         "color": color,
                         "align": "center",
                         "baseline": "top",
@@ -111,8 +125,13 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                 }
             )
     else:
-        y0, y1 = y, y + length
+        y0 = y
+        y1 = float(a["y2"]) if a.get("y2") is not None else y + length
         mid = (y0 + y1) / 2
+        if tick_ratio is not None:
+            x_lo, x_hi = x / float(tick_ratio), x * float(tick_ratio)
+        else:
+            x_lo, x_hi = x - tick, x + tick
         layers.append(
             {
                 "data": {"values": [{"x": x, "y": y0, "y2": y1}]},
@@ -128,8 +147,8 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "data": {
                     "values": [
-                        {"x": x - tick, "x2": x + tick, "y": y0},
-                        {"x": x - tick, "x2": x + tick, "y": y1},
+                        {"x": x_lo, "x2": x_hi, "y": y0},
+                        {"x": x_lo, "x2": x_hi, "y": y1},
                     ]
                 },
                 "mark": {"type": "rule", "strokeWidth": sw, "color": color},
@@ -147,7 +166,9 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "mark": {
                         "type": "text",
                         "dx": 10,
-                        "fontSize": 11,
+                        "fontSize": 12,
+                        "font": _SERIF,
+                        "fontStyle": "italic",
                         "color": color,
                         "align": "left",
                         "baseline": "middle",

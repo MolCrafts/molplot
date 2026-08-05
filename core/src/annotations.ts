@@ -24,8 +24,18 @@ export type ScaleBarAnnotation = {
   /**
    * End-cap half-length in data units on the perpendicular axis.
    * Defaults to a small fraction of `length` (or absolute fallback).
+   * Prefer {@link tickRatio} on log scales.
    */
   tick?: number;
+  /**
+   * Geometric end-cap half-span on log axes: cap runs from
+   * `y / tickRatio` to `y * tickRatio` (horizontal bar). Default none.
+   */
+  tickRatio?: number;
+  /** Absolute end (overrides `x + length` when set). */
+  x2?: number;
+  /** Absolute end for a vertical bar (overrides `y + length` when set). */
+  y2?: number;
 };
 
 export type ArrowAnnotation = {
@@ -56,18 +66,30 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
   const color = a.color ?? "#14271d";
   const sw = a.strokeWidth ?? 1.6;
   const horizontal = (a.orientation ?? "horizontal") === "horizontal";
-  const tick =
-    a.tick ??
-    (Number.isFinite(a.length) && a.length !== 0
-      ? Math.abs(a.length) * 0.08
-      : 0.05);
-
+  const font = "Times New Roman, Times, STIX Two Text, STIXGeneral, serif";
   const layers: VegaLiteSpec[] = [];
 
   if (horizontal) {
     const x0 = a.x;
-    const x1 = a.x + a.length;
+    const x1 =
+      a.x2 ?? a.x + (Number.isFinite(a.length) ? (a.length as number) : 0);
     const mid = (x0 + x1) / 2;
+    const yLo =
+      a.tickRatio != null
+        ? a.y / a.tickRatio
+        : a.y -
+          (a.tick ??
+            (Number.isFinite(a.length) && a.length
+              ? Math.abs(a.length) * 0.08
+              : 0.05));
+    const yHi =
+      a.tickRatio != null
+        ? a.y * a.tickRatio
+        : a.y +
+          (a.tick ??
+            (Number.isFinite(a.length) && a.length
+              ? Math.abs(a.length) * 0.08
+              : 0.05));
     layers.push(
       cleanLayer({
         data: { values: [{ x: x0, x2: x1, y: a.y }] },
@@ -81,8 +103,8 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
       cleanLayer({
         data: {
           values: [
-            { x: x0, y: a.y - tick, y2: a.y + tick },
-            { x: x1, y: a.y - tick, y2: a.y + tick },
+            { x: x0, y: yLo, y2: yHi },
+            { x: x1, y: yLo, y2: yHi },
           ],
         },
         mark: { type: "rule", strokeWidth: sw, color },
@@ -100,7 +122,9 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
           mark: {
             type: "text",
             dy: 12,
-            fontSize: 11,
+            fontSize: 12,
+            font,
+            fontStyle: "italic",
             color,
             align: "center",
             baseline: "top",
@@ -115,8 +139,16 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
     }
   } else {
     const y0 = a.y;
-    const y1 = a.y + a.length;
+    const y1 =
+      a.y2 ?? a.y + (Number.isFinite(a.length) ? (a.length as number) : 0);
     const mid = (y0 + y1) / 2;
+    const tick =
+      a.tick ??
+      (Number.isFinite(a.length) && a.length
+        ? Math.abs(a.length) * 0.08
+        : 0.05);
+    const xLo = a.tickRatio != null ? a.x / a.tickRatio : a.x - tick;
+    const xHi = a.tickRatio != null ? a.x * a.tickRatio : a.x + tick;
     layers.push(
       cleanLayer({
         data: { values: [{ x: a.x, y: y0, y2: y1 }] },
@@ -130,8 +162,8 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
       cleanLayer({
         data: {
           values: [
-            { x: a.x - tick, x2: a.x + tick, y: y0 },
-            { x: a.x - tick, x2: a.x + tick, y: y1 },
+            { x: xLo, x2: xHi, y: y0 },
+            { x: xLo, x2: xHi, y: y1 },
           ],
         },
         mark: { type: "rule", strokeWidth: sw, color },
@@ -149,7 +181,9 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
           mark: {
             type: "text",
             dx: 10,
-            fontSize: 11,
+            fontSize: 12,
+            font,
+            fontStyle: "italic",
             color,
             align: "left",
             baseline: "middle",

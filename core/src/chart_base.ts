@@ -23,7 +23,7 @@ interface SceneItem {
 }
 
 /** Minimal shape of the vega-embed result we depend on. */
-interface EmbedResult {
+export interface EmbedResult {
   view: {
     data(name: string, values?: unknown[]): unknown;
     resize(): { run(): unknown };
@@ -31,10 +31,12 @@ interface EmbedResult {
     /** Top-left of the plot rectangle within the rendered element. */
     origin(): number[];
     signal(name: string): unknown;
+    /** Named scale: data value → plot-local pixel (undefined if missing). */
+    scale(name: string): ((value: number) => number) | undefined;
     scenegraph(): { root: SceneItem };
     addEventListener(
       type: string,
-      handler: (e: unknown, item: unknown) => void,
+      handler: (e: unknown, item?: unknown) => void,
     ): void;
     finalize(): void;
   };
@@ -215,7 +217,14 @@ export abstract class VegaChart {
     this.zoomable = zoomParamsOf(spec).length > 0;
     this.rendered = this.container.querySelector("svg");
     this.result = result;
+    this.afterRender(result);
   }
+
+  /**
+   * Hook after a successful embed (subclasses: annotation overlays, etc.).
+   * Default no-op.
+   */
+  protected afterRender(_result: EmbedResult): void {}
 
   /**
    * Wheel interaction for scale zoom:

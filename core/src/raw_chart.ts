@@ -1,5 +1,9 @@
-import { takeAnnotations, withAnnotations } from "./annotations";
-import { VegaChart } from "./chart_base";
+import {
+  type Annotation,
+  drawAnnotations,
+  takeAnnotations,
+} from "./annotations";
+import { type EmbedResult, VegaChart } from "./chart_base";
 import type { PresetName } from "./preset";
 import {
   interactionParams,
@@ -10,51 +14,45 @@ import { type ChartTheme, fontScaleForWidth, vegaConfig } from "./theme";
 import type { ThemeMode } from "./types";
 
 /**
- * Escape hatch: render an arbitrary Vega-Lite spec verbatim. Now that the
- * intermediate language *is* Vega-Lite, "render whatever upstream emitted"
- * (an LLM agent, a saved report, a Python-built spec shipped to the browser)
- * is a first-class path — the same spec the Python package can render to
- * matplotlib. The unified preset `config` is injected unless the spec already
- * carries its own.
- *
- * NOTE (migration): the former plotly-based `RawChart` accepted
- * `{data, layout, config}` plotly JSON. That is not portable to Vega; callers
- * that fed plotly specs must now supply a Vega-Lite spec via `config.spec`.
+ * Escape hatch: render an arbitrary Vega-Lite spec. Optional top-level
+ * `annotations` (molplot extension) are stripped before embed and painted
+ * as a screen-space SVG overlay after layout / on pan-zoom.
  */
 export interface RawChartConfig {
-  /** A Vega-Lite top-level spec. Inline `data.values` is rendered as-is. */
+  /** A Vega-Lite top-level spec (plus optional `annotations`). */
   spec: VegaLiteSpec;
-  /**
-   * Which unified preset to inject as the spec `config` when the spec carries
-   * none. Defaults to the default preset — the same tokens the Python package
-   * applies. A spec with its own `config` is always respected verbatim.
-   */
   preset?: PresetName;
-  /** Theme mode. `auto` (default) tracks `<html class="dark">`. */
   theme?: ThemeMode;
-  /** Add scale-bound pan/zoom controls when the spec has none. Default: true. */
+  /** Scale-bound pan/zoom when the spec has continuous x/y. Default true. */
   interactive?: boolean;
-  /** Responsive width:height ratio. Default: 4 / 3. */
+  /** Responsive width:height ratio. Default 4 / 3. */
   aspectRatio?: number;
 }
 
 export class RawChart extends VegaChart {
-  private spec: VegaLiteSpec;
-  private interactive: boolean;
-  private aspectRatio: number;
+  private spec: VegaLiteSpec = {};
+  private interactive = true;
+  private aspectRatio = 4 / 3;
+  private annotations: Annotation[] = [];
 
   constructor(container: HTMLElement, config: RawChartConfig) {
     super(container, config.theme ?? "auto", config.preset);
-    this.spec = config.spec;
-    this.interactive = config.interactive ?? true;
-    this.aspectRatio = config.aspectRatio ?? 4 / 3;
+    this.applyConfig(config);
   }
 
   async update(config: RawChartConfig): Promise<void> {
-    this.spec = config.spec;
+    this.applyConfig(config);
+    await this.rerender();
+  }
+
+  private applyConfig(config: RawChartConfig): void {
+    const taken = takeAnnotations({
+      ...((config.spec ?? {}) as Record<string, unknown>),
+    });
+    this.spec = taken.spec as VegaLiteSpec;
+    this.annotations = taken.annotations;
     this.interactive = config.interactive ?? true;
     this.aspectRatio = config.aspectRatio ?? 4 / 3;
-    await this.rerender();
   }
 
   protected datasets(): Record<string, unknown[]> {
@@ -65,24 +63,45 @@ export class RawChart extends VegaChart {
     previous: { width: number; height: number },
     next: { width: number; height: number },
   ): boolean {
-    // With the default 4:3 size, height is derived exclusively from width.
-    // SVG axes can perturb an auto-height DOM box, but that is render output,
-    // not an input resize. Ignoring it prevents ResizeObserver → re-embed loops.
     if (this.spec?.height === undefined) return previous.width !== next.width;
     return super.resizeChanged(previous, next);
+  }
+
+  /** Paint scale bars / arrows after embed and whenever scales move. */
+  protected afterRender(result: EmbedResult): void {
+    this.paintAnnotations(result);
+    // Redraw overlay when the user pans/zooms (scales change).
+    const view = result.view;
+    const redraw = (): void => {
+      requestAnimationFrame(() => this.paintAnnotations(result));
+    };
+    view.addEventListener("wheel", redraw);
+    view.addEventListener("mousedown", () => {
+      const move = (): void => redraw();
+      const up = (): void => {
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+        redraw();
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    });
+    view.addEventListener("dblclick", redraw);
+  }
+
+  private paintAnnotations(result: EmbedResult): void {
+    if (!this.annotations.length) return;
+    const svg = this.container.querySelector("svg");
+    if (!svg) return;
+    drawAnnotations(svg, result.view, this.annotations);
   }
 
   protected buildSpec(
     theme: ChartTheme,
     sizeHint: { width: number; height: number },
   ): VegaLiteSpec {
-    // Strip top-level `annotations` and expand to VL layers (scale bar / arrow).
-    const taken = takeAnnotations({ ...(this.spec ?? {}) });
-    const spec = withAnnotations(taken.spec, taken.annotations);
+    const spec = { ...(this.spec ?? {}) } as VegaLiteSpec;
     const channels = this.interactive ? continuousChannels(spec) : [];
-    // Prefer the host box height when the element has a real layout size so a
-    // 4:3 (or author aspect) frame is fully painted — not a short SVG floating
-    // in a taller white box. Fall back to width/aspect for headless/zero-size.
     const derivedHeight = Math.max(
       1,
       Math.round(sizeHint.width / this.aspectRatio),
@@ -101,9 +120,6 @@ export class RawChart extends VegaChart {
       ? deepMergeConfig(baseConfig, authorConfig)
       : baseConfig;
 
-    // `fit` + `contains: "padding"`: width/height are the outer SVG box
-    // (axes + legends + pad). Multi-legend specs stay inside the host without
-    // overlapping titles when type sizes stay moderate.
     const base: VegaLiteSpec = {
       $schema: "https://vega.github.io/schema/vega-lite/v5.json",
       width: sizeHint.width,
@@ -116,12 +132,24 @@ export class RawChart extends VegaChart {
     if (channels.length === 0) return base;
 
     const zoom = interactionParams(channels);
-    // Layered agent/LLM specs put encoding on layer[0]; zoom params must live
-    // on a *unit* layer (top-level params on layered specs are illegal /
-    // duplicate). Unit specs take top-level params.
     const layers = Array.isArray(spec.layer)
       ? (spec.layer as Record<string, unknown>[])
       : null;
+    const topEncoding =
+      spec.encoding && typeof spec.encoding === "object"
+        ? (spec.encoding as Record<string, unknown>)
+        : null;
+
+    // Shared top-level encoding (docs layered charts): bind:scales must be
+    // top-level or pan/zoom never attaches to the shared axes.
+    if (layers && layers.length > 0 && topEncoding) {
+      return {
+        ...base,
+        params: mergeZoomParams(spec.params, zoom),
+      };
+    }
+
+    // Encoding only on unit layers: params live on the first unit layer.
     if (layers && layers.length > 0) {
       const nextLayers = layers.map((layer, i) => {
         if (i !== 0) return layer;
@@ -130,7 +158,6 @@ export class RawChart extends VegaChart {
           params: mergeZoomParams(layer.params, zoom),
         };
       });
-      // Drop any top-level params so we don't duplicate zoom signal names.
       const { params: _drop, ...rest } = base;
       return { ...rest, layer: nextLayers };
     }
@@ -190,20 +217,24 @@ function deepMergeConfig(
 }
 
 /**
- * Continuous x/y channels from a unit spec **or** the first layer of a
- * layered spec (agent/LLM VL almost always uses ``layer``).
+ * Continuous x/y channels: merge top-level encoding (type/scale) with the
+ * first layer that declares fields (docs layered charts often split these).
  */
 function continuousChannels(spec: VegaLiteSpec): ZoomChannel[] {
   const top = spec.encoding as
-    | Record<string, { type?: string } | undefined>
+    | Record<string, { type?: string; field?: string } | undefined>
     | undefined;
   const layers = Array.isArray(spec.layer)
-    ? (spec.layer as { encoding?: Record<string, { type?: string }> }[])
+    ? (spec.layer as {
+        encoding?: Record<string, { type?: string; field?: string }>;
+      }[])
     : [];
-  const encoding =
-    top ?? layers.find((layer) => layer?.encoding)?.encoding ?? undefined;
+  const layerEnc = layers.find((layer) => layer?.encoding)?.encoding;
   return (["x", "y"] as const).filter((channel) => {
-    const type = encoding?.[channel]?.type;
-    return type === "quantitative" || type === "temporal";
+    const type = top?.[channel]?.type ?? layerEnc?.[channel]?.type;
+    if (type === "quantitative" || type === "temporal") return true;
+    // Field on a layer + scale/type on top still counts as continuous.
+    const field = top?.[channel]?.field ?? layerEnc?.[channel]?.field;
+    return Boolean(field && (top?.[channel]?.type || top?.[channel]));
   });
 }

@@ -23,6 +23,26 @@ describe("annotations", () => {
     expect((layers[2].mark as { type: string }).type).toBe("text");
   });
 
+  it("builds an along-curve chord with log-perp end-caps", () => {
+    const layers = annotationLayers([
+      {
+        kind: "scaleBar",
+        orientation: "along",
+        x: 0.18,
+        y: 0.0324,
+        x2: 0.65,
+        y2: 0.4225,
+        label: "ballistic",
+      },
+    ]);
+    expect(layers.length).toBe(3);
+    const bar = layers[0].data as { values: { x2: number; y2: number }[] };
+    expect(bar.values[0].x2).toBeCloseTo(0.65);
+    expect(bar.values[0].y2).toBeCloseTo(0.4225);
+    const caps = layers[1].data as { values: unknown[] };
+    expect(caps.values).toHaveLength(2);
+  });
+
   it("builds an arrow as rule + tip (+ optional label)", () => {
     const layers = annotationLayers([
       {

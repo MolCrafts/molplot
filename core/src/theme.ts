@@ -86,16 +86,14 @@ export const MOLPLOT_DESIGN_WIDTH = 320;
 /**
  * Scale factor for screen / docs hosts.
  *
- * Paper preset is ~9–12 px at {@link MOLPLOT_DESIGN_WIDTH}. Docs use a **2×**
- * floor (200% of paper) and track host width so labels/ticks grow on large
- * pages (cap 3×). Fixed px in a fence `config` freeze type size — prefer
- * leaving sizes to this scale.
+ * Paper is ~9–12 px at {@link MOLPLOT_DESIGN_WIDTH}. Docs need much larger
+ * type (axis title / tick / annotation) — floor **3×** paper at design width,
+ * track host width up to **4.5×**. Fixed `fontSize` in a fence freezes size.
  */
 export function fontScaleForWidth(width: number): number {
-  if (!Number.isFinite(width) || width <= 0) return 2;
+  if (!Number.isFinite(width) || width <= 0) return 3;
   const tracked = width / MOLPLOT_DESIGN_WIDTH;
-  // 2× paper at design width; scales with page width up to 3×.
-  return Math.min(3, Math.max(2, 2 * tracked));
+  return Math.min(4.5, Math.max(3, 3 * tracked));
 }
 
 /**

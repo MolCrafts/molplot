@@ -56,10 +56,33 @@ Annotation = ScaleBarAnnotation | ArrowAnnotation
 _SERIF = "Times New Roman, Times, STIX Two Text, STIXGeneral, serif"
 
 
+def _log_perp_cap(
+    x: float, y: float, x0: float, y0: float, x1: float, y1: float, s: float
+) -> dict[str, float]:
+    import math
+
+    dx = math.log(x1 / x0)
+    dy = math.log(y1 / y0)
+    n = math.hypot(dx, dy) or 1.0
+    px, py = (-dy / n) * s, (dx / n) * s
+    return {
+        "x": math.exp(math.log(x) + px),
+        "y": math.exp(math.log(y) + py),
+        "x2": math.exp(math.log(x) - px),
+        "y2": math.exp(math.log(y) - py),
+    }
+
+
 def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
+    import math
+
     color = a.get("color") or "#14271d"
-    sw = a.get("strokeWidth") or 1.6
-    horizontal = (a.get("orientation") or "horizontal") == "horizontal"
+    sw = a.get("strokeWidth") or 1.8
+    orient = a.get("orientation") or "horizontal"
+    x2, y2 = a.get("x2"), a.get("y2")
+    along = orient == "along" or (
+        x2 is not None and y2 is not None and orient not in ("horizontal", "vertical")
+    )
     length = float(a["length"]) if a.get("length") is not None else 0.0
     tick = a.get("tick")
     if tick is None:
@@ -68,6 +91,64 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
     x, y = float(a["x"]), float(a["y"])
     layers: list[dict[str, Any]] = []
 
+    if along and x2 is not None and y2 is not None:
+        x0, y0, x1, y1 = x, y, float(x2), float(y2)
+        mid_x = math.exp(0.5 * (math.log(x0) + math.log(x1)))
+        mid_y = math.exp(0.5 * (math.log(y0) + math.log(y1)))
+        s = float(a.get("capLog") or 0.18)
+        layers.append(
+            {
+                "data": {"values": [{"x": x0, "y": y0, "x2": x1, "y2": y1}]},
+                "mark": {"type": "rule", "strokeWidth": sw, "color": color, "strokeCap": "butt"},
+                "encoding": {
+                    "x": {"field": "x", "type": "quantitative"},
+                    "y": {"field": "y", "type": "quantitative"},
+                    "x2": {"field": "x2"},
+                    "y2": {"field": "y2"},
+                },
+            }
+        )
+        layers.append(
+            {
+                "data": {
+                    "values": [
+                        _log_perp_cap(x0, y0, x0, y0, x1, y1, s),
+                        _log_perp_cap(x1, y1, x0, y0, x1, y1, s),
+                    ]
+                },
+                "mark": {"type": "rule", "strokeWidth": sw, "color": color},
+                "encoding": {
+                    "x": {"field": "x", "type": "quantitative"},
+                    "y": {"field": "y", "type": "quantitative"},
+                    "x2": {"field": "x2"},
+                    "y2": {"field": "y2"},
+                },
+            }
+        )
+        if a.get("label"):
+            layers.append(
+                {
+                    "data": {
+                        "values": [{"x": mid_x, "y": mid_y * 1.55, "label": a["label"]}]
+                    },
+                    "mark": {
+                        "type": "text",
+                        "font": _SERIF,
+                        "fontStyle": "normal",
+                        "color": color,
+                        "align": "center",
+                        "baseline": "bottom",
+                    },
+                    "encoding": {
+                        "x": {"field": "x", "type": "quantitative"},
+                        "y": {"field": "y", "type": "quantitative"},
+                        "text": {"field": "label", "type": "nominal"},
+                    },
+                }
+            )
+        return layers
+
+    horizontal = orient == "horizontal"
     if horizontal:
         x0 = x
         x1 = float(a["x2"]) if a.get("x2") is not None else x + length

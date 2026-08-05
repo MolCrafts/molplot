@@ -12,30 +12,36 @@ import type { VegaLiteSpec } from "./specs";
 
 export type ScaleBarAnnotation = {
   kind: "scaleBar";
-  /** Data-coordinate start of the bar (x for horizontal, y for vertical). */
+  /** Start of the bar (data coords). */
   x: number;
   y: number;
-  /** Length in data units along the bar axis. */
-  length: number;
+  /**
+   * Length along a horizontal/vertical axis. Ignored when both
+   * {@link x2} and {@link y2} are set (matplotlib-style chord on a curve).
+   */
+  length?: number;
   label?: string;
   color?: string;
   strokeWidth?: number;
-  orientation?: "horizontal" | "vertical";
   /**
-   * End-cap half-length in data units on the perpendicular axis.
-   * Defaults to a small fraction of `length` (or absolute fallback).
-   * Prefer {@link tickRatio} on log scales.
+   * `horizontal` / `vertical` axis-aligned bars, or `along` for a free
+   * segment (x,y)→(x2,y2) with end-caps ⊥ in log–log space (default when
+   * both ends are given).
    */
+  orientation?: "horizontal" | "vertical" | "along";
+  /** Linear end-cap half-length (axis-aligned modes). */
   tick?: number;
-  /**
-   * Geometric end-cap half-span on log axes: cap runs from
-   * `y / tickRatio` to `y * tickRatio` (horizontal bar). Default none.
-   */
+  /** Geometric end-cap half-span on log axes (axis-aligned modes). */
   tickRatio?: number;
-  /** Absolute end (overrides `x + length` when set). */
+  /** End x (with y2: chord along curve). */
   x2?: number;
-  /** Absolute end for a vertical bar (overrides `y + length` when set). */
+  /** End y (with x2: chord along curve). */
   y2?: number;
+  /**
+   * Log-space half-length of end-caps for `along` chords (default 0.18).
+   * Caps are perpendicular to the segment in (ln x, ln y).
+   */
+  capLog?: number;
 };
 
 export type ArrowAnnotation = {
@@ -62,12 +68,101 @@ function cleanLayer(layer: Record<string, unknown>): VegaLiteSpec {
   return layer as VegaLiteSpec;
 }
 
+/** End-cap endpoints ⊥ to (x0,y0)→(x1,y1) in log–log space (matplotlib-like). */
+function logPerpCap(
+  x: number,
+  y: number,
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number,
+  s: number,
+): { x: number; y: number; x2: number; y2: number } {
+  const dx = Math.log(x1 / x0);
+  const dy = Math.log(y1 / y0);
+  const n = Math.hypot(dx, dy) || 1;
+  const px = (-dy / n) * s;
+  const py = (dx / n) * s;
+  return {
+    x: Math.exp(Math.log(x) + px),
+    y: Math.exp(Math.log(y) + py),
+    x2: Math.exp(Math.log(x) - px),
+    y2: Math.exp(Math.log(y) - py),
+  };
+}
+
 function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
   const color = a.color ?? "#14271d";
-  const sw = a.strokeWidth ?? 1.6;
-  const horizontal = (a.orientation ?? "horizontal") === "horizontal";
+  const sw = a.strokeWidth ?? 1.8;
   const font = "Times New Roman, Times, STIX Two Text, STIXGeneral, serif";
   const layers: VegaLiteSpec[] = [];
+
+  // Matplotlib-style chord on a curve: both ends fully specified.
+  const along =
+    a.orientation === "along" ||
+    (a.x2 != null &&
+      a.y2 != null &&
+      a.orientation !== "horizontal" &&
+      a.orientation !== "vertical");
+
+  if (along && a.x2 != null && a.y2 != null) {
+    const x0 = a.x;
+    const y0 = a.y;
+    const x1 = a.x2;
+    const y1 = a.y2;
+    const midX = Math.exp(0.5 * (Math.log(x0) + Math.log(x1)));
+    const midY = Math.exp(0.5 * (Math.log(y0) + Math.log(y1)));
+    const s = a.capLog ?? 0.18;
+    const c0 = logPerpCap(x0, y0, x0, y0, x1, y1, s);
+    const c1 = logPerpCap(x1, y1, x0, y0, x1, y1, s);
+    layers.push(
+      cleanLayer({
+        data: { values: [{ x: x0, y: y0, x2: x1, y2: y1 }] },
+        mark: { type: "rule", strokeWidth: sw, color, strokeCap: "butt" },
+        encoding: {
+          x: { field: "x", type: "quantitative" },
+          y: { field: "y", type: "quantitative" },
+          x2: { field: "x2" },
+          y2: { field: "y2" },
+        },
+      }),
+      cleanLayer({
+        data: { values: [c0, c1] },
+        mark: { type: "rule", strokeWidth: sw, color },
+        encoding: {
+          x: { field: "x", type: "quantitative" },
+          y: { field: "y", type: "quantitative" },
+          x2: { field: "x2" },
+          y2: { field: "y2" },
+        },
+      }),
+    );
+    if (a.label) {
+      layers.push(
+        cleanLayer({
+          data: {
+            values: [{ x: midX, y: midY * 1.55, label: a.label }],
+          },
+          mark: {
+            type: "text",
+            font,
+            fontStyle: "normal",
+            color,
+            align: "center",
+            baseline: "bottom",
+          },
+          encoding: {
+            x: { field: "x", type: "quantitative" },
+            y: { field: "y", type: "quantitative" },
+            text: { field: "label", type: "nominal" },
+          },
+        }),
+      );
+    }
+    return layers;
+  }
+
+  const horizontal = (a.orientation ?? "horizontal") === "horizontal";
 
   if (horizontal) {
     const x0 = a.x;
@@ -80,7 +175,7 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
         : a.y -
           (a.tick ??
             (Number.isFinite(a.length) && a.length
-              ? Math.abs(a.length) * 0.08
+              ? Math.abs(a.length as number) * 0.08
               : 0.05));
     const yHi =
       a.tickRatio != null
@@ -88,7 +183,7 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
         : a.y +
           (a.tick ??
             (Number.isFinite(a.length) && a.length
-              ? Math.abs(a.length) * 0.08
+              ? Math.abs(a.length as number) * 0.08
               : 0.05));
     layers.push(
       cleanLayer({
@@ -144,7 +239,7 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
     const tick =
       a.tick ??
       (Number.isFinite(a.length) && a.length
-        ? Math.abs(a.length) * 0.08
+        ? Math.abs(a.length as number) * 0.08
         : 0.05);
     const xLo = a.tickRatio != null ? a.x / a.tickRatio : a.x - tick;
     const xHi = a.tickRatio != null ? a.x * a.tickRatio : a.x + tick;

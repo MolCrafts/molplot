@@ -63,14 +63,15 @@ describe("vegaConfig", () => {
 });
 
 describe("fontScaleForWidth", () => {
-  it("is 1 at the paper design width and grows for wider hosts", async () => {
+  it("is 2× paper at design width and grows with host (cap 3×)", async () => {
     const { fontScaleForWidth, MOLPLOT_DESIGN_WIDTH } = await import(
       "../src/theme"
     );
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH)).toBe(1.5);
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 1.2)).toBeCloseTo(1.5, 5);
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 1.8)).toBeCloseTo(1.8, 5);
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 3)).toBe(2);
-    expect(fontScaleForWidth(0)).toBe(1.6);
+    // 200% of paper at design width; tracks page size up to 3×.
+    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH)).toBe(2);
+    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 1.2)).toBeCloseTo(2.4, 5);
+    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 1.8)).toBe(3);
+    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 3)).toBe(3);
+    expect(fontScaleForWidth(0)).toBe(2);
   });
 });

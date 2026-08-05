@@ -109,13 +109,12 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "data": {"values": [{"x": mid, "y": y, "label": a["label"]}]},
                     "mark": {
                         "type": "text",
-                        "dy": 12,
-                        "fontSize": 12,
+                        "dy": -10,
                         "font": _SERIF,
-                        "fontStyle": "italic",
+                        "fontStyle": "normal",
                         "color": color,
                         "align": "center",
-                        "baseline": "top",
+                        "baseline": "bottom",
                     },
                     "encoding": {
                         "x": {"field": "x", "type": "quantitative"},
@@ -166,9 +165,8 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                     "mark": {
                         "type": "text",
                         "dx": 10,
-                        "fontSize": 12,
                         "font": _SERIF,
-                        "fontStyle": "italic",
+                        "fontStyle": "normal",
                         "color": color,
                         "align": "left",
                         "baseline": "middle",

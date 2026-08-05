@@ -121,13 +121,12 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
           data: { values: [{ x: mid, y: a.y, label: a.label }] },
           mark: {
             type: "text",
-            dy: 12,
-            fontSize: 12,
+            dy: -10,
             font,
-            fontStyle: "italic",
+            fontStyle: "normal",
             color,
             align: "center",
-            baseline: "top",
+            baseline: "bottom",
           },
           encoding: {
             x: { field: "x", type: "quantitative" },
@@ -181,9 +180,8 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
           mark: {
             type: "text",
             dx: 10,
-            fontSize: 12,
             font,
-            fontStyle: "italic",
+            fontStyle: "normal",
             color,
             align: "left",
             baseline: "middle",

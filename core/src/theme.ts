@@ -86,14 +86,16 @@ export const MOLPLOT_DESIGN_WIDTH = 320;
 /**
  * Scale factor for screen / docs hosts.
  *
- * Paper preset is ~9–12 px at {@link MOLPLOT_DESIGN_WIDTH}. Docs want roughly
- * 1.5–1.8× as a floor so labels stay readable without eating the plot area
- * (multi-legend charts need room). Track width up to 2× on wide hosts.
+ * Paper preset is ~9–12 px at {@link MOLPLOT_DESIGN_WIDTH}. Docs use a **2×**
+ * floor (200% of paper) and track host width so labels/ticks grow on large
+ * pages (cap 3×). Fixed px in a fence `config` freeze type size — prefer
+ * leaving sizes to this scale.
  */
 export function fontScaleForWidth(width: number): number {
-  if (!Number.isFinite(width) || width <= 0) return 1.6;
+  if (!Number.isFinite(width) || width <= 0) return 2;
   const tracked = width / MOLPLOT_DESIGN_WIDTH;
-  return Math.min(2, Math.max(1.5, tracked));
+  // 2× paper at design width; scales with page width up to 3×.
+  return Math.min(3, Math.max(2, 2 * tracked));
 }
 
 /**
@@ -129,12 +131,14 @@ export function vegaConfig(
       titleFontSize: px(theme.fontSize.label),
       labelFont: theme.font.family,
       titleFont: theme.font.family,
-      titlePadding: Math.round(6 * scale),
-      labelPadding: Math.round(3 * scale),
+      titleFontStyle: "normal",
+      labelFontStyle: "normal",
+      titlePadding: Math.round(8 * scale),
+      labelPadding: Math.round(4 * scale),
       grid: true,
-      tickSize: Math.max(4, Math.round(3.5 * scale)),
-      labelLimit: Math.round(160 * scale),
-      titleLimit: Math.round(200 * scale),
+      tickSize: Math.max(5, Math.round(4 * scale)),
+      labelLimit: Math.round(220 * scale),
+      titleLimit: Math.round(280 * scale),
       labelOverlap: true,
       labelFlush: true,
     },
@@ -159,6 +163,13 @@ export function vegaConfig(
       fontSize: px(theme.fontSize.title),
       font: theme.font.family,
       fontWeight: 600,
+      fontStyle: "normal",
+    },
+    text: {
+      font: theme.font.family,
+      fontSize: px(theme.fontSize.label),
+      color: theme.font.color,
+      fontStyle: "normal",
     },
     view: {
       stroke: null,

@@ -23,6 +23,8 @@ from __future__ import annotations
 
 from .annotations import (
     annotation_layers,
+    arrow,
+    scale_bar,
     take_annotations,
     with_annotations,
 )
@@ -68,7 +70,9 @@ __all__ = [
     "gantt_spec",
     "vega_config",
     "VL_SCHEMA",
-    # annotations
+    # annotations (matplotlib-style: one call = full artist)
+    "scale_bar",
+    "arrow",
     "annotation_layers",
     "with_annotations",
     "take_annotations",

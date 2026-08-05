@@ -1,14 +1,44 @@
 import type { VegaLiteSpec } from "./specs";
 
 /**
- * Chart annotations — portable Vega-Lite layers for paper/web.
+ * Chart annotations — one object owns a complete artist (matplotlib model).
  *
- * - {@link ScaleBarAnnotation}: a `|———|` scale bar in data coordinates
- * - {@link ArrowAnnotation}: a directed arrow (rule + tip) with optional label
+ * - {@link scaleBar} / `kind: "scaleBar"` ≈ `FancyArrowPatch(arrowstyle='|-|')`
+ *   — spine + both end-caps + label. Never hand-draw caps as separate layers.
+ * - {@link arrow} / `kind: "arrow"` ≈ `annotate(..., arrowstyle='->')`.
  *
  * Pass via `withAnnotations(spec, …)` or a top-level `annotations` array on a
- * RawChart / fence spec (stripped before vega-embed).
+ * RawChart / fence spec (expanded to VL layers; stripped before vega-embed).
  */
+
+/** Factory: one complete `|———|` (spine + ⊥ caps + label). */
+export function scaleBar(
+  partial: Omit<ScaleBarAnnotation, "kind">,
+): ScaleBarAnnotation {
+  const hasEnds = partial.x2 != null && partial.y2 != null;
+  return {
+    color: "#18432b",
+    strokeWidth: 1.8,
+    orientation: hasEnds ? "along" : "horizontal",
+    offsetLog: hasEnds ? 0.42 : undefined,
+    capLog: hasEnds ? 0.16 : undefined,
+    ...partial,
+    kind: "scaleBar",
+  };
+}
+
+/** Factory: one complete arrow (shaft + tip + optional label). */
+export function arrow(
+  partial: Omit<ArrowAnnotation, "kind">,
+): ArrowAnnotation {
+  return {
+    color: "#18432b",
+    strokeWidth: 1.6,
+    tipSize: 55,
+    ...partial,
+    kind: "arrow",
+  };
+}
 
 export type ScaleBarAnnotation = {
   kind: "scaleBar";

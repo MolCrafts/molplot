@@ -8,6 +8,8 @@ export type {
 } from "./annotations";
 export {
   annotationLayers,
+  arrow,
+  scaleBar,
   takeAnnotations,
   withAnnotations,
 } from "./annotations";

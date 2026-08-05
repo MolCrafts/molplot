@@ -1,11 +1,15 @@
-"""Chart annotations — portable Vega-Lite layers (mirrors core/src/annotations.ts).
+"""Chart annotations — one call draws a complete artist (mirrors TS).
 
-Kinds:
-  * ``scaleBar`` — a ``|———|`` bar in data coordinates
-  * ``arrow``    — directed arrow (rule + tip) with optional label
+Design follows matplotlib:
 
-Use :func:`with_annotations` on any unit/layered VL dict, or put an
-``annotations`` list on a fence / RawChart payload (stripped before render).
+* ``scale_bar(...)`` ≈ ``FancyArrowPatch(..., arrowstyle='|-|')`` plus a
+  label — **one** object owns the spine, both end-caps, and the text.
+  Callers never draw caps by hand.
+* ``arrow(...)`` ≈ ``ax.annotate(..., arrowprops=dict(arrowstyle='->'))``.
+
+Expand with :func:`with_annotations` / a top-level ``annotations`` list on a
+Vega-Lite fence or :class:`RawChart` payload. The expansion always emits
+bar + caps + label as a single unit.
 """
 
 from __future__ import annotations
@@ -17,6 +21,8 @@ __all__ = [
     "ScaleBarAnnotation",
     "ArrowAnnotation",
     "Annotation",
+    "scale_bar",
+    "arrow",
     "annotation_layers",
     "with_annotations",
     "take_annotations",
@@ -24,6 +30,8 @@ __all__ = [
 
 
 class ScaleBarAnnotation(TypedDict, total=False):
+    """One complete ``|———|`` (spine + ⊥ caps + optional label)."""
+
     kind: Literal["scaleBar"]
     x: float
     y: float
@@ -33,9 +41,11 @@ class ScaleBarAnnotation(TypedDict, total=False):
     label: str
     color: str
     strokeWidth: float
-    orientation: Literal["horizontal", "vertical"]
+    orientation: Literal["horizontal", "vertical", "along"]
     tick: float
     tickRatio: float
+    capLog: float
+    offsetLog: float
 
 
 class ArrowAnnotation(TypedDict, total=False):
@@ -52,15 +62,121 @@ class ArrowAnnotation(TypedDict, total=False):
 
 Annotation = ScaleBarAnnotation | ArrowAnnotation
 
-
 _SERIF = "Times New Roman, Times, STIX Two Text, STIXGeneral, serif"
+
+
+def scale_bar(
+    x: float,
+    y: float,
+    *,
+    x2: float | None = None,
+    y2: float | None = None,
+    length: float | None = None,
+    label: str | None = None,
+    orientation: Literal["horizontal", "vertical", "along"] | None = None,
+    offset: float = 0.42,
+    capsize: float = 0.16,
+    color: str = "#18432b",
+    linewidth: float = 1.8,
+    tick: float | None = None,
+    tick_ratio: float | None = None,
+) -> ScaleBarAnnotation:
+    """Build one complete ``|———|`` annotation (matplotlib ``arrowstyle='|-|'``).
+
+    Parameters
+    ----------
+    x, y
+        Start in data coordinates. For ``orientation='along'`` this is a point
+        **on the curve** (reference chord start).
+    x2, y2
+        End of the chord (required for ``along``; optional for axis-aligned
+        when ``length`` is given).
+    length
+        Axis-aligned length when ``x2``/``y2`` are omitted.
+    label
+        Text drawn with the bar (Times roman). Owned by this artist — do not
+        add a separate text layer.
+    orientation
+        ``'along'`` — chord parallel to ``(x,y)→(x2,y2)``, offset off the
+        path by ``offset`` in log–log space, end-caps ⊥ bar (default when
+        both ends are given).
+        ``'horizontal'`` / ``'vertical'`` — axis-aligned size bar.
+    offset
+        Log-space normal offset from the reference chord (``along`` only).
+        Default ``0.42`` so the bar does not sit on the curve. ``0`` = on chord.
+    capsize
+        Log-space half-length of each end-cap (``along``). Default ``0.16``.
+    color, linewidth
+        Stroke style for spine and caps together.
+
+    Returns
+    -------
+    ScaleBarAnnotation
+        Pass inside ``annotations=[...]`` or to :func:`with_annotations`.
+        Expansion yields spine + both caps + label — never hand-draw caps.
+    """
+    if orientation is None:
+        orientation = (
+            "along"
+            if x2 is not None and y2 is not None
+            else "horizontal"
+        )
+    out: ScaleBarAnnotation = {
+        "kind": "scaleBar",
+        "x": float(x),
+        "y": float(y),
+        "color": color,
+        "strokeWidth": float(linewidth),
+        "orientation": orientation,
+    }
+    if x2 is not None:
+        out["x2"] = float(x2)
+    if y2 is not None:
+        out["y2"] = float(y2)
+    if length is not None:
+        out["length"] = float(length)
+    if label is not None:
+        out["label"] = label
+    if orientation == "along":
+        out["offsetLog"] = float(offset)
+        out["capLog"] = float(capsize)
+    if tick is not None:
+        out["tick"] = float(tick)
+    if tick_ratio is not None:
+        out["tickRatio"] = float(tick_ratio)
+    return out
+
+
+def arrow(
+    x: float,
+    y: float,
+    x2: float,
+    y2: float,
+    *,
+    label: str | None = None,
+    color: str = "#18432b",
+    linewidth: float = 1.6,
+    tip_size: float = 55,
+) -> ArrowAnnotation:
+    """Build one complete arrow (matplotlib ``arrowstyle='->'``)."""
+    out: ArrowAnnotation = {
+        "kind": "arrow",
+        "x": float(x),
+        "y": float(y),
+        "x2": float(x2),
+        "y2": float(y2),
+        "color": color,
+        "strokeWidth": float(linewidth),
+        "tipSize": float(tip_size),
+    }
+    if label is not None:
+        out["label"] = label
+    return out
 
 
 def _log_perp_cap(
     x: float, y: float, x0: float, y0: float, x1: float, y1: float, s: float
 ) -> dict[str, float]:
-    import math
-
     dx = math.log(x1 / x0)
     dy = math.log(y1 / y0)
     n = math.hypot(dx, dy) or 1.0
@@ -74,9 +190,8 @@ def _log_perp_cap(
 
 
 def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
-    import math
-
-    color = a.get("color") or "#14271d"
+    """Expand **one** scaleBar into spine + caps + label (internal)."""
+    color = a.get("color") or "#18432b"
     sw = a.get("strokeWidth") or 1.8
     orient = a.get("orientation") or "horizontal"
     x2, y2 = a.get("x2"), a.get("y2")
@@ -92,30 +207,33 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
     layers: list[dict[str, Any]] = []
 
     if along and x2 is not None and y2 is not None:
-        # Reference chord on the curve → translate along log-normal (offset)
-        # so the bar is parallel and does not overlap the path.
         rx0, ry0, rx1, ry1 = x, y, float(x2), float(y2)
         dx = math.log(rx1 / rx0)
         dy = math.log(ry1 / ry0)
         n = math.hypot(dx, dy) or 1.0
         ux, uy = dx / n, dy / n
         side = 1
-        # Prefer the normal that raises mid-y on log–log plots.
         if math.exp(0.5 * (math.log(ry0) + math.log(ry1)) - ux * 0.1) > math.exp(
             0.5 * (math.log(ry0) + math.log(ry1)) + ux * 0.1
         ):
             side = -1
-        s_off = float(a.get("offsetLog") if a.get("offsetLog") is not None else 0.42)
+        s_off = float(a["offsetLog"]) if a.get("offsetLog") is not None else 0.42
         ox, oy = -uy * s_off * side, ux * s_off * side
         x0 = math.exp(math.log(rx0) + ox)
         y0 = math.exp(math.log(ry0) + oy)
         x1 = math.exp(math.log(rx1) + ox)
         y1 = math.exp(math.log(ry1) + oy)
-        s_cap = float(a.get("capLog") or 0.16)
+        s_cap = float(a["capLog"]) if a.get("capLog") is not None else 0.16
+        # spine
         layers.append(
             {
                 "data": {"values": [{"x": x0, "y": y0, "x2": x1, "y2": y1}]},
-                "mark": {"type": "rule", "strokeWidth": sw, "color": color, "strokeCap": "butt"},
+                "mark": {
+                    "type": "rule",
+                    "strokeWidth": sw,
+                    "color": color,
+                    "strokeCap": "butt",
+                },
                 "encoding": {
                     "x": {"field": "x", "type": "quantitative"},
                     "y": {"field": "y", "type": "quantitative"},
@@ -124,6 +242,7 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                 },
             }
         )
+        # both end-caps (owned by this scale_bar — not a separate API call)
         layers.append(
             {
                 "data": {
@@ -143,8 +262,12 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
         )
         if a.get("label"):
             s_lab = s_off + 0.32
-            lx = math.exp(0.5 * (math.log(rx0) + math.log(rx1)) + -uy * s_lab * side)
-            ly = math.exp(0.5 * (math.log(ry0) + math.log(ry1)) + ux * s_lab * side)
+            lx = math.exp(
+                0.5 * (math.log(rx0) + math.log(rx1)) + -uy * s_lab * side
+            )
+            ly = math.exp(
+                0.5 * (math.log(ry0) + math.log(ry1)) + ux * s_lab * side
+            )
             layers.append(
                 {
                     "data": {"values": [{"x": lx, "y": ly, "label": a["label"]}]},
@@ -168,7 +291,7 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
     horizontal = orient == "horizontal"
     if horizontal:
         x0 = x
-        x1 = float(a["x2"]) if a.get("x2") is not None else x + length
+        x1 = float(x2) if x2 is not None else x + length
         mid = (x0 + x1) / 2
         if tick_ratio is not None:
             y_lo, y_hi = y / float(tick_ratio), y * float(tick_ratio)
@@ -177,7 +300,12 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
         layers.append(
             {
                 "data": {"values": [{"x": x0, "x2": x1, "y": y}]},
-                "mark": {"type": "rule", "strokeWidth": sw, "color": color, "strokeCap": "butt"},
+                "mark": {
+                    "type": "rule",
+                    "strokeWidth": sw,
+                    "color": color,
+                    "strokeCap": "butt",
+                },
                 "encoding": {
                     "x": {"field": "x", "type": "quantitative"},
                     "x2": {"field": "x2"},
@@ -221,66 +349,73 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
                     },
                 }
             )
+        return layers
+
+    # vertical
+    y0 = y
+    y1 = float(y2) if y2 is not None else y + length
+    mid = (y0 + y1) / 2
+    if tick_ratio is not None:
+        x_lo, x_hi = x / float(tick_ratio), x * float(tick_ratio)
     else:
-        y0 = y
-        y1 = float(a["y2"]) if a.get("y2") is not None else y + length
-        mid = (y0 + y1) / 2
-        if tick_ratio is not None:
-            x_lo, x_hi = x / float(tick_ratio), x * float(tick_ratio)
-        else:
-            x_lo, x_hi = x - tick, x + tick
+        x_lo, x_hi = x - tick, x + tick
+    layers.append(
+        {
+            "data": {"values": [{"x": x, "y": y0, "y2": y1}]},
+            "mark": {
+                "type": "rule",
+                "strokeWidth": sw,
+                "color": color,
+                "strokeCap": "butt",
+            },
+            "encoding": {
+                "x": {"field": "x", "type": "quantitative"},
+                "y": {"field": "y", "type": "quantitative"},
+                "y2": {"field": "y2"},
+            },
+        }
+    )
+    layers.append(
+        {
+            "data": {
+                "values": [
+                    {"x": x_lo, "x2": x_hi, "y": y0},
+                    {"x": x_lo, "x2": x_hi, "y": y1},
+                ]
+            },
+            "mark": {"type": "rule", "strokeWidth": sw, "color": color},
+            "encoding": {
+                "x": {"field": "x", "type": "quantitative"},
+                "x2": {"field": "x2"},
+                "y": {"field": "y", "type": "quantitative"},
+            },
+        }
+    )
+    if a.get("label"):
         layers.append(
             {
-                "data": {"values": [{"x": x, "y": y0, "y2": y1}]},
-                "mark": {"type": "rule", "strokeWidth": sw, "color": color, "strokeCap": "butt"},
+                "data": {"values": [{"x": x, "y": mid, "label": a["label"]}]},
+                "mark": {
+                    "type": "text",
+                    "dx": 10,
+                    "font": _SERIF,
+                    "fontStyle": "normal",
+                    "color": color,
+                    "align": "left",
+                    "baseline": "middle",
+                },
                 "encoding": {
                     "x": {"field": "x", "type": "quantitative"},
                     "y": {"field": "y", "type": "quantitative"},
-                    "y2": {"field": "y2"},
+                    "text": {"field": "label", "type": "nominal"},
                 },
             }
         )
-        layers.append(
-            {
-                "data": {
-                    "values": [
-                        {"x": x_lo, "x2": x_hi, "y": y0},
-                        {"x": x_lo, "x2": x_hi, "y": y1},
-                    ]
-                },
-                "mark": {"type": "rule", "strokeWidth": sw, "color": color},
-                "encoding": {
-                    "x": {"field": "x", "type": "quantitative"},
-                    "x2": {"field": "x2"},
-                    "y": {"field": "y", "type": "quantitative"},
-                },
-            }
-        )
-        if a.get("label"):
-            layers.append(
-                {
-                    "data": {"values": [{"x": x, "y": mid, "label": a["label"]}]},
-                    "mark": {
-                        "type": "text",
-                        "dx": 10,
-                        "font": _SERIF,
-                        "fontStyle": "normal",
-                        "color": color,
-                        "align": "left",
-                        "baseline": "middle",
-                    },
-                    "encoding": {
-                        "x": {"field": "x", "type": "quantitative"},
-                        "y": {"field": "y", "type": "quantitative"},
-                        "text": {"field": "label", "type": "nominal"},
-                    },
-                }
-            )
     return layers
 
 
 def _arrow_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
-    color = a.get("color") or "#14271d"
+    color = a.get("color") or "#18432b"
     sw = a.get("strokeWidth") or 1.6
     tip_size = a.get("tipSize") or 55
     x, y = float(a["x"]), float(a["y"])
@@ -289,7 +424,12 @@ def _arrow_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
     layers: list[dict[str, Any]] = [
         {
             "data": {"values": [{"x": x, "y": y, "x2": x2, "y2": y2}]},
-            "mark": {"type": "rule", "strokeWidth": sw, "color": color, "strokeCap": "round"},
+            "mark": {
+                "type": "rule",
+                "strokeWidth": sw,
+                "color": color,
+                "strokeCap": "round",
+            },
             "encoding": {
                 "x": {"field": "x", "type": "quantitative"},
                 "y": {"field": "y", "type": "quantitative"},
@@ -318,13 +458,18 @@ def _arrow_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "data": {
                     "values": [
-                        {"x": (x + x2) / 2, "y": (y + y2) / 2, "label": a["label"]}
+                        {
+                            "x": (x + x2) / 2,
+                            "y": (y + y2) / 2,
+                            "label": a["label"],
+                        }
                     ]
                 },
                 "mark": {
                     "type": "text",
                     "dy": -8,
-                    "fontSize": 11,
+                    "font": _SERIF,
+                    "fontStyle": "normal",
                     "color": color,
                     "align": "center",
                     "baseline": "bottom",
@@ -340,6 +485,7 @@ def _arrow_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def annotation_layers(annotations: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Expand each annotation into its full set of VL layers."""
     out: list[dict[str, Any]] = []
     for a in annotations:
         kind = a.get("kind")
@@ -373,7 +519,9 @@ def with_annotations(
     return {**spec, "layer": extra}
 
 
-def take_annotations(spec: dict[str, Any]) -> tuple[dict[str, Any], list[Annotation]]:
+def take_annotations(
+    spec: dict[str, Any],
+) -> tuple[dict[str, Any], list[Annotation]]:
     """Pull top-level ``annotations`` off a payload; return ``(spec, list)``."""
     raw = spec.get("annotations")
     if not isinstance(raw, list) or not raw:

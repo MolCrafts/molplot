@@ -23,7 +23,7 @@ describe("annotations", () => {
     expect((layers[2].mark as { type: string }).type).toBe("text");
   });
 
-  it("builds an along-curve chord with log-perp end-caps", () => {
+  it("offsets along-curve bars off the path with log-perp end-caps", () => {
     const layers = annotationLayers([
       {
         kind: "scaleBar",
@@ -32,13 +32,17 @@ describe("annotations", () => {
         y: 0.0324,
         x2: 0.65,
         y2: 0.4225,
+        offsetLog: 0.42,
         label: "ballistic",
       },
     ]);
     expect(layers.length).toBe(3);
-    const bar = layers[0].data as { values: { x2: number; y2: number }[] };
-    expect(bar.values[0].x2).toBeCloseTo(0.65);
-    expect(bar.values[0].y2).toBeCloseTo(0.4225);
+    const bar = layers[0].data as {
+      values: { x: number; y: number; x2: number; y2: number }[];
+    };
+    // Bar is translated off the chord — not the raw endpoints.
+    expect(bar.values[0].x).not.toBeCloseTo(0.18, 2);
+    expect(bar.values[0].y).not.toBeCloseTo(0.0324, 2);
     const caps = layers[1].data as { values: unknown[] };
     expect(caps.values).toHaveLength(2);
   });

@@ -92,10 +92,26 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
     layers: list[dict[str, Any]] = []
 
     if along and x2 is not None and y2 is not None:
-        x0, y0, x1, y1 = x, y, float(x2), float(y2)
-        mid_x = math.exp(0.5 * (math.log(x0) + math.log(x1)))
-        mid_y = math.exp(0.5 * (math.log(y0) + math.log(y1)))
-        s = float(a.get("capLog") or 0.18)
+        # Reference chord on the curve → translate along log-normal (offset)
+        # so the bar is parallel and does not overlap the path.
+        rx0, ry0, rx1, ry1 = x, y, float(x2), float(y2)
+        dx = math.log(rx1 / rx0)
+        dy = math.log(ry1 / ry0)
+        n = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / n, dy / n
+        side = 1
+        # Prefer the normal that raises mid-y on log–log plots.
+        if math.exp(0.5 * (math.log(ry0) + math.log(ry1)) - ux * 0.1) > math.exp(
+            0.5 * (math.log(ry0) + math.log(ry1)) + ux * 0.1
+        ):
+            side = -1
+        s_off = float(a.get("offsetLog") if a.get("offsetLog") is not None else 0.42)
+        ox, oy = -uy * s_off * side, ux * s_off * side
+        x0 = math.exp(math.log(rx0) + ox)
+        y0 = math.exp(math.log(ry0) + oy)
+        x1 = math.exp(math.log(rx1) + ox)
+        y1 = math.exp(math.log(ry1) + oy)
+        s_cap = float(a.get("capLog") or 0.16)
         layers.append(
             {
                 "data": {"values": [{"x": x0, "y": y0, "x2": x1, "y2": y1}]},
@@ -112,8 +128,8 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "data": {
                     "values": [
-                        _log_perp_cap(x0, y0, x0, y0, x1, y1, s),
-                        _log_perp_cap(x1, y1, x0, y0, x1, y1, s),
+                        _log_perp_cap(x0, y0, x0, y0, x1, y1, s_cap),
+                        _log_perp_cap(x1, y1, x0, y0, x1, y1, s_cap),
                     ]
                 },
                 "mark": {"type": "rule", "strokeWidth": sw, "color": color},
@@ -126,18 +142,19 @@ def _scale_bar_layers(a: Mapping[str, Any]) -> list[dict[str, Any]]:
             }
         )
         if a.get("label"):
+            s_lab = s_off + 0.32
+            lx = math.exp(0.5 * (math.log(rx0) + math.log(rx1)) + -uy * s_lab * side)
+            ly = math.exp(0.5 * (math.log(ry0) + math.log(ry1)) + ux * s_lab * side)
             layers.append(
                 {
-                    "data": {
-                        "values": [{"x": mid_x, "y": mid_y * 1.55, "label": a["label"]}]
-                    },
+                    "data": {"values": [{"x": lx, "y": ly, "label": a["label"]}]},
                     "mark": {
                         "type": "text",
                         "font": _SERIF,
                         "fontStyle": "normal",
                         "color": color,
                         "align": "center",
-                        "baseline": "bottom",
+                        "baseline": "middle",
                     },
                     "encoding": {
                         "x": {"field": "x", "type": "quantitative"},

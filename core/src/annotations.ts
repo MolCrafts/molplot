@@ -38,10 +38,16 @@ export type ScaleBarAnnotation = {
   /** End y (with x2: chord along curve). */
   y2?: number;
   /**
-   * Log-space half-length of end-caps for `along` chords (default 0.18).
-   * Caps are perpendicular to the segment in (ln x, ln y).
+   * Log-space half-length of end-caps for `along` chords (default 0.16).
+   * Caps are perpendicular to the bar in (ln x, ln y).
    */
   capLog?: number;
+  /**
+   * Log-space offset of an `along` bar from the chord (x,y)→(x2,y2),
+   * along the path normal so the bar does not sit on the curve (default 0.42).
+   * Set 0 to draw on the chord itself.
+   */
+  offsetLog?: number;
 };
 
 export type ArrowAnnotation = {
@@ -106,15 +112,47 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
       a.orientation !== "vertical");
 
   if (along && a.x2 != null && a.y2 != null) {
-    const x0 = a.x;
-    const y0 = a.y;
-    const x1 = a.x2;
-    const y1 = a.y2;
-    const midX = Math.exp(0.5 * (Math.log(x0) + Math.log(x1)));
-    const midY = Math.exp(0.5 * (Math.log(y0) + Math.log(y1)));
-    const s = a.capLog ?? 0.18;
-    const c0 = logPerpCap(x0, y0, x0, y0, x1, y1, s);
-    const c1 = logPerpCap(x1, y1, x0, y0, x1, y1, s);
+    // Chord on the curve (reference), then translate along the log-normal so
+    // the visible bar is parallel and does not overlap the path.
+    const rx0 = a.x;
+    const ry0 = a.y;
+    const rx1 = a.x2;
+    const ry1 = a.y2;
+    const dx = Math.log(rx1 / rx0);
+    const dy = Math.log(ry1 / ry0);
+    const n = Math.hypot(dx, dy) || 1;
+    const ux = dx / n;
+    const uy = dy / n;
+    // Prefer the normal that raises mid-y (above the curve on log–log plots).
+    let side = 1;
+    {
+      const midYPlus = Math.exp(
+        0.5 * (Math.log(ry0) + Math.log(ry1)) + ux * 0.1,
+      );
+      const midYMinus = Math.exp(
+        0.5 * (Math.log(ry0) + Math.log(ry1)) - ux * 0.1,
+      );
+      // offset uses perp (-uy, ux); mid log-y shift is ±ux * s
+      if (midYMinus > midYPlus) side = -1;
+    }
+    const sOff = a.offsetLog ?? 0.42;
+    const ox = -uy * sOff * side;
+    const oy = ux * sOff * side;
+    const x0 = Math.exp(Math.log(rx0) + ox);
+    const y0 = Math.exp(Math.log(ry0) + oy);
+    const x1 = Math.exp(Math.log(rx1) + ox);
+    const y1 = Math.exp(Math.log(ry1) + oy);
+    const sCap = a.capLog ?? 0.16;
+    const c0 = logPerpCap(x0, y0, x0, y0, x1, y1, sCap);
+    const c1 = logPerpCap(x1, y1, x0, y0, x1, y1, sCap);
+    // Label further out along the same normal.
+    const sLab = sOff + 0.32;
+    const lx = Math.exp(
+      0.5 * (Math.log(rx0) + Math.log(rx1)) + -uy * sLab * side,
+    );
+    const ly = Math.exp(
+      0.5 * (Math.log(ry0) + Math.log(ry1)) + ux * sLab * side,
+    );
     layers.push(
       cleanLayer({
         data: { values: [{ x: x0, y: y0, x2: x1, y2: y1 }] },
@@ -140,16 +178,14 @@ function scaleBarLayers(a: ScaleBarAnnotation): VegaLiteSpec[] {
     if (a.label) {
       layers.push(
         cleanLayer({
-          data: {
-            values: [{ x: midX, y: midY * 1.55, label: a.label }],
-          },
+          data: { values: [{ x: lx, y: ly, label: a.label }] },
           mark: {
             type: "text",
             font,
             fontStyle: "normal",
             color,
             align: "center",
-            baseline: "bottom",
+            baseline: "middle",
           },
           encoding: {
             x: { field: "x", type: "quantitative" },

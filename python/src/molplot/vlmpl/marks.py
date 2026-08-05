@@ -181,12 +181,60 @@ def _draw_bar_or_interval(ax: Any, rows: list[dict], enc: dict, mark: dict) -> b
     return _draw_bar(ax, rows, enc, mark)
 
 
+def _draw_rule(ax: Any, rows: list[dict], enc: dict, mark: dict) -> bool:
+    """Rule segments: (x,y)→(x2,y) or (x,y)→(x,y2) or both endpoints free."""
+    if not rows:
+        return False
+    color = mark.get("color")
+    lw = mark.get("strokeWidth", 1.5)
+    for r in rows:
+        x = enc.get("x")
+        y = enc.get("y")
+        x2 = enc.get("x2")
+        y2 = enc.get("y2")
+        x0 = r[x.field] if x and x.field else r.get("x")
+        y0 = r[y.field] if y and y.field else r.get("y")
+        x1 = r[x2.field] if x2 and x2.field else (r.get("x2", x0))
+        y1 = r[y2.field] if y2 and y2.field else (r.get("y2", y0))
+        ax.plot([x0, x1], [y0, y1], color=color, linewidth=lw, solid_capstyle="butt")
+    return False
+
+
+def _draw_text(ax: Any, rows: list[dict], enc: dict, mark: dict) -> bool:
+    if not rows:
+        return False
+    xf = enc["x"].field if enc.get("x") else "x"
+    yf = enc["y"].field if enc.get("y") else "y"
+    tf = enc["text"].field if enc.get("text") else "label"
+    color = mark.get("color")
+    size = mark.get("fontSize", 10)
+    # Approximate Vega dy (px down) as a small data offset is hard; use annotate.
+    dy = mark.get("dy", 0) or 0
+    dx = mark.get("dx", 0) or 0
+    for r in rows:
+        ax.annotate(
+            str(r.get(tf, "")),
+            xy=(r[xf], r[yf]),
+            xytext=(dx, -dy if dy else 0),
+            textcoords="offset points",
+            color=color,
+            fontsize=size,
+            ha=mark.get("align", "center"),
+            va={"top": "top", "bottom": "bottom", "middle": "center"}.get(
+                mark.get("baseline", "middle"), "center"
+            ),
+        )
+    return False
+
+
 MARK_ENCODERS = {
     "line": _draw_line,
     "point": _draw_point,
     "circle": _draw_point,
     "square": _draw_point,
     "bar": _draw_bar_or_interval,
+    "rule": _draw_rule,
+    "text": _draw_text,
 }
 
 

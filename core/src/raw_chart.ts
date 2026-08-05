@@ -1,3 +1,4 @@
+import { takeAnnotations, withAnnotations } from "./annotations";
 import { VegaChart } from "./chart_base";
 import type { PresetName } from "./preset";
 import {
@@ -75,7 +76,9 @@ export class RawChart extends VegaChart {
     theme: ChartTheme,
     sizeHint: { width: number; height: number },
   ): VegaLiteSpec {
-    const spec = this.spec ?? {};
+    // Strip top-level `annotations` and expand to VL layers (scale bar / arrow).
+    const taken = takeAnnotations({ ...(this.spec ?? {}) });
+    const spec = withAnnotations(taken.spec, taken.annotations);
     const channels = this.interactive ? continuousChannels(spec) : [];
     // Prefer the host box height when the element has a real layout size so a
     // 4:3 (or author aspect) frame is fully painted — not a short SVG floating
@@ -94,25 +97,69 @@ export class RawChart extends VegaChart {
       spec.config && typeof spec.config === "object"
         ? (spec.config as Record<string, unknown>)
         : null;
+    const config = authorConfig
+      ? deepMergeConfig(baseConfig, authorConfig)
+      : baseConfig;
+
     // `fit` + `contains: "padding"`: width/height are the outer SVG box
     // (axes + legends + pad). Multi-legend specs stay inside the host without
     // overlapping titles when type sizes stay moderate.
-    return {
+    const base: VegaLiteSpec = {
       $schema: "https://vega.github.io/schema/vega-lite/v5.json",
       width: sizeHint.width,
       height,
       autosize: { type: "fit", contains: "padding" },
       ...spec,
-      ...(channels.length > 0 && spec.params === undefined
-        ? { params: interactionParams(channels) }
-        : {}),
-      // Always inject the scaled preset; deep-merge author config so partial
-      // docs overrides (font sizes) do not wipe palette / axis colours.
-      config: authorConfig
-        ? deepMergeConfig(baseConfig, authorConfig)
-        : baseConfig,
+      config,
+    };
+
+    if (channels.length === 0) return base;
+
+    const zoom = interactionParams(channels);
+    // Layered agent/LLM specs put encoding on layer[0]; zoom params must live
+    // on a *unit* layer (top-level params on layered specs are illegal /
+    // duplicate). Unit specs take top-level params.
+    const layers = Array.isArray(spec.layer)
+      ? (spec.layer as Record<string, unknown>[])
+      : null;
+    if (layers && layers.length > 0) {
+      const nextLayers = layers.map((layer, i) => {
+        if (i !== 0) return layer;
+        return {
+          ...layer,
+          params: mergeZoomParams(layer.params, zoom),
+        };
+      });
+      // Drop any top-level params so we don't duplicate zoom signal names.
+      const { params: _drop, ...rest } = base;
+      return { ...rest, layer: nextLayers };
+    }
+
+    return {
+      ...base,
+      params: mergeZoomParams(spec.params, zoom),
     };
   }
+}
+
+/** Keep author params; replace/add molplot zoom binds by name. */
+function mergeZoomParams(
+  existing: unknown,
+  zoom: ReturnType<typeof interactionParams>,
+): unknown[] {
+  const zoomNames = new Set(zoom.map((p) => p.name));
+  const kept: unknown[] = [];
+  if (Array.isArray(existing)) {
+    for (const p of existing) {
+      const name =
+        p && typeof p === "object" && "name" in p
+          ? String((p as { name: unknown }).name)
+          : "";
+      if (name && zoomNames.has(name as "zoomX" | "zoomY")) continue;
+      kept.push(p);
+    }
+  }
+  return [...kept, ...zoom];
 }
 
 /** Deep-merge plain config objects (arrays / scalars replaced, objects merged). */
@@ -142,10 +189,19 @@ function deepMergeConfig(
   return out;
 }
 
+/**
+ * Continuous x/y channels from a unit spec **or** the first layer of a
+ * layered spec (agent/LLM VL almost always uses ``layer``).
+ */
 function continuousChannels(spec: VegaLiteSpec): ZoomChannel[] {
-  const encoding = spec.encoding as
+  const top = spec.encoding as
     | Record<string, { type?: string } | undefined>
     | undefined;
+  const layers = Array.isArray(spec.layer)
+    ? (spec.layer as { encoding?: Record<string, { type?: string }> }[])
+    : [];
+  const encoding =
+    top ?? layers.find((layer) => layer?.encoding)?.encoding ?? undefined;
   return (["x", "y"] as const).filter((channel) => {
     const type = encoding?.[channel]?.type;
     return type === "quantitative" || type === "temporal";

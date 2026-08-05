@@ -72,6 +72,25 @@ The generated preset files (`core/src/presets/generated.ts`,
 `python/src/molplot/presets/*`) are committed and guarded in CI — run
 `npm run build:presets` after editing any `presets/*.json` and commit the result.
 
+## Documentation
+
+Full manual: [docs.molcrafts.org/molplot](https://docs.molcrafts.org/molplot/)
+(sources in [`docs/`](docs/)):
+
+- [Getting started](https://docs.molcrafts.org/molplot/getting-started/)
+- [Unified preset](https://docs.molcrafts.org/molplot/getting-started/preset/)
+- [Web (Vega-Lite)](https://docs.molcrafts.org/molplot/getting-started/web/)
+- [Python (scienceplots)](https://docs.molcrafts.org/molplot/getting-started/python/)
+- [Charts in Markdown](https://docs.molcrafts.org/molplot/getting-started/markdown/)
+- [API reference](https://docs.molcrafts.org/molplot/api/)
+
+```bash
+# local preview
+pip install -e ./python  # or: pip install molcrafts-molplot
+pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.2.5"
+zensical serve
+```
+
 ## License
 
 BSD-3-Clause

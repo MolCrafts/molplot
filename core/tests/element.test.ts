@@ -226,7 +226,7 @@ describe("RawChart (the element's renderer)", () => {
     chart.dispose();
   });
 
-  it("preserves explicitly authored interaction params", async () => {
+  it("keeps authored params and merges zoom binds for continuous axes", async () => {
     const params = [{ name: "pick", select: "point" }];
     const chart = new RawChart(container, {
       spec: {
@@ -236,7 +236,35 @@ describe("RawChart (the element's renderer)", () => {
       },
     });
     await chart.ready();
-    expect((fake.specs[0] as Record<string, unknown>).params).toBe(params);
+    const out = (fake.specs[0] as Record<string, unknown>).params as {
+      name: string;
+    }[];
+    expect(out.map((p) => p.name)).toEqual(
+      expect.arrayContaining(["pick", "zoomX"]),
+    );
+    chart.dispose();
+  });
+
+  it("injects zoom params on layer[0] for layered agent specs", async () => {
+    const chart = new RawChart(container, {
+      interactive: true,
+      spec: {
+        layer: [
+          {
+            mark: "point",
+            encoding: {
+              x: { field: "N", type: "quantitative" },
+              y: { field: "Rg", type: "quantitative" },
+            },
+          },
+        ],
+      },
+    });
+    await chart.ready();
+    const layers = (fake.specs[0] as { layer: { params?: { name: string }[] }[] })
+      .layer;
+    expect(layers[0].params?.map((p) => p.name)).toEqual(["zoomX", "zoomY"]);
+    expect((fake.specs[0] as { params?: unknown }).params).toBeUndefined();
     chart.dispose();
   });
 

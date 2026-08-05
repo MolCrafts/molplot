@@ -218,17 +218,15 @@ export abstract class VegaChart {
   }
 
   /**
-   * Wheel over an axis zooms that axis alone. The spec's zoom params filter on
-   * flags this stamps, because a Vega event filter cannot read the `width` /
-   * `height` signals it would need to locate the pointer itself — see
-   * `ZOOM_EVENT_FLAG` in `specs.ts`.
+   * Wheel interaction for scale zoom:
+   * - Axis gutter → that axis alone (classic molplot behaviour)
+   * - Plot interior → both continuous axes (embed-friendly; chat ScrollAreas
+   *   no longer need Shift+wheel for a first useful zoom)
+   * - Shift+wheel still works via the VL filter without flags
    *
-   * Bound once for the chart's life: the listener sits on `container`, which
-   * vega-embed renders into but never replaces.
-   *
-   * Passive, capture phase, and it never calls `preventDefault()`. Consuming
-   * the wheel is Vega's job and it only does so for a wheel its own selector
-   * matched, which is why an unmatched wheel still scrolls the enclosing panel.
+   * Bound once on `container` (vega-embed never replaces it). Non-passive so
+   * we can `preventDefault` and stop the host page/chat from scrolling when
+   * a zoom actually applies.
    */
   private bindAxisHoverZoom(): () => void {
     const onWheel = (event: Event): void => {
@@ -237,16 +235,33 @@ export abstract class VegaChart {
       const rect = this.rendered.getBoundingClientRect();
       const [originX, originY] = view.origin();
       const wheel = event as ZoomWheelEvent;
+      const width = view.signal("width") as number;
+      const height = view.signal("height") as number;
+      const localX = wheel.clientX - rect.left - originX;
+      const localY = wheel.clientY - rect.top - originY;
       const channel = axisChannelAt(
         axisBounds(view.scenegraph().root),
-        wheel.clientX - rect.left - originX,
-        wheel.clientY - rect.top - originY,
-        view.signal("width") as number,
-        view.signal("height") as number,
+        localX,
+        localY,
+        width,
+        height,
       );
-      if (channel) wheel[ZOOM_EVENT_FLAG[channel]] = true;
+      if (channel) {
+        wheel[ZOOM_EVENT_FLAG[channel]] = true;
+        wheel.preventDefault();
+        return;
+      }
+      // Plot interior: stamp both flags so ordinary wheel zooms the chart
+      // (otherwise only gutter hits or Shift+wheel did anything).
+      const inPlot =
+        localX >= 0 && localX <= width && localY >= 0 && localY <= height;
+      if (inPlot || wheel.shiftKey) {
+        wheel[ZOOM_EVENT_FLAG.x] = true;
+        wheel[ZOOM_EVENT_FLAG.y] = true;
+        wheel.preventDefault();
+      }
     };
-    const options = { capture: true, passive: true };
+    const options: AddEventListenerOptions = { capture: true, passive: false };
     this.container.addEventListener("wheel", onWheel, options);
     return () => this.container.removeEventListener("wheel", onWheel, options);
   }

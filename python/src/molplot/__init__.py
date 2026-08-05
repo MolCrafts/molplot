@@ -21,6 +21,11 @@ Quick start::
 
 from __future__ import annotations
 
+from .annotations import (
+    annotation_layers,
+    take_annotations,
+    with_annotations,
+)
 from .charts import bar, gantt, line, scatter
 from .convert import to_png, to_svg
 from .palette import color, cycle, default_color, diverging, palette, sequential
@@ -30,7 +35,7 @@ from .specs import VL_SCHEMA, bar_spec, gantt_spec, line_spec, scatter_spec
 from .style import available, register, science_base, style, use
 from .vega_config import vega_config
 
-__version__ = "0.1.2"
+__version__ = "0.1.4"
 
 # Register the generated *.mplstyle files so `plt.style.use("molplot")` works.
 register()
@@ -63,6 +68,10 @@ __all__ = [
     "gantt_spec",
     "vega_config",
     "VL_SCHEMA",
+    # annotations
+    "annotation_layers",
+    "with_annotations",
+    "take_annotations",
     # render
     "render",
     "line",

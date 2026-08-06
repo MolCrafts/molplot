@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "molcrafts-molplot"
-version = "0.1.4"
+version = "0.1.5"
 description = "Unified scientific charting: scienceplots + a matplotlib-portable Vega-Lite preset"
 readme = "README.md"
 license = "BSD-3-Clause"

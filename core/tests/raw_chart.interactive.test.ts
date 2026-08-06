@@ -52,7 +52,7 @@ function zoomPlacement(
   if (channels.length === 0) return "none";
   const layers = Array.isArray(spec.layer) ? spec.layer : null;
   // Multi-layer always uses layer0 — top-level params duplicate VL selection
-  // signals when annotation (or any extra) layers are present.
+  // signals when extra layers are present.
   if (layers && layers.length > 0) return "layer0";
   return "top";
 }
@@ -117,7 +117,7 @@ describe("RawChart interactive injection", () => {
     ).toBe("layer0");
   });
 
-  it("places zoom params on layer0 when annotation layers are present", () => {
+  it("places zoom params on layer0 when extra rule layers are present", () => {
     expect(
       zoomPlacement({
         encoding: {

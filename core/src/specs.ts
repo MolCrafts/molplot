@@ -1,6 +1,6 @@
 import type { BarChartConfig, BarSeriesConfig } from "./bar_chart";
 import type { GanttChartConfig } from "./gantt_chart";
-import { type ChartTheme, fontScaleForWidth, vegaConfig } from "./theme";
+import { type ChartTheme, fontScaleForHost, vegaConfig } from "./theme";
 import type { AxisConfig, LineChartConfig, ScatterChartConfig } from "./types";
 
 /**
@@ -134,7 +134,10 @@ function themedConfig(
   theme: ChartTheme,
   width: number | "container",
 ): Record<string, unknown> {
-  const scale = typeof width === "number" ? fontScaleForWidth(width) : 1;
+  const scale =
+    typeof width === "number"
+      ? fontScaleForHost(width, theme.hostFontPx ?? 13)
+      : 1;
   return vegaConfig(theme, scale);
 }
 

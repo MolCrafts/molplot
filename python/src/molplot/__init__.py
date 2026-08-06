@@ -21,13 +21,6 @@ Quick start::
 
 from __future__ import annotations
 
-from .annotations import (
-    annotation_layers,
-    arrow,
-    scale_bar,
-    take_annotations,
-    with_annotations,
-)
 from .charts import bar, gantt, line, scatter
 from .convert import to_png, to_svg
 from .palette import color, cycle, default_color, diverging, palette, sequential
@@ -70,12 +63,6 @@ __all__ = [
     "gantt_spec",
     "vega_config",
     "VL_SCHEMA",
-    # annotations (matplotlib-style: one call = full artist)
-    "scale_bar",
-    "arrow",
-    "annotation_layers",
-    "with_annotations",
-    "take_annotations",
     # render
     "render",
     "line",

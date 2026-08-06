@@ -1,4 +1,3 @@
-import { takeAnnotations, withAnnotations } from "./annotations";
 import { VegaChart } from "./chart_base";
 import type { PresetName } from "./preset";
 import {
@@ -6,15 +5,15 @@ import {
   type VegaLiteSpec,
   type ZoomChannel,
 } from "./specs";
-import { type ChartTheme, fontScaleForWidth, vegaConfig } from "./theme";
+import { type ChartTheme, fontScaleForHost, vegaConfig } from "./theme";
 import type { ThemeMode } from "./types";
 
 /**
- * Render a Vega-Lite spec. Optional top-level `annotations` (molplot
- * extension) expand into ordinary VL layers so they pan/zoom with the chart.
+ * Render a plain Vega-Lite top-level spec. Labels/rules are ordinary VL marks
+ * in `layer` so they pan/zoom with the chart.
  */
 export interface RawChartConfig {
-  /** A Vega-Lite top-level spec (plus optional `annotations`). */
+  /** A Vega-Lite top-level spec. */
   spec: VegaLiteSpec;
   preset?: PresetName;
   theme?: ThemeMode;
@@ -61,11 +60,8 @@ export class RawChart extends VegaChart {
     theme: ChartTheme,
     sizeHint: { width: number; height: number },
   ): VegaLiteSpec {
-    // Expand annotations → VL layers (scenegraph), then inject zoom params.
-    const taken = takeAnnotations({
-      ...((this.spec ?? {}) as Record<string, unknown>),
-    });
-    const spec = withAnnotations(taken.spec as VegaLiteSpec, taken.annotations);
+    const scale = fontScaleForHost(sizeHint.width, theme.hostFontPx);
+    const spec = { ...(this.spec ?? {}) } as VegaLiteSpec;
     const channels = this.interactive ? continuousChannels(spec) : [];
     const derivedHeight = Math.max(
       1,
@@ -75,14 +71,13 @@ export class RawChart extends VegaChart {
       sizeHint.height > 1
         ? Math.max(1, Math.round(sizeHint.height))
         : derivedHeight;
-    const scale = fontScaleForWidth(sizeHint.width);
     const baseConfig = vegaConfig(theme, scale);
     const authorConfig =
       spec.config && typeof spec.config === "object"
         ? (spec.config as Record<string, unknown>)
         : null;
     const config = authorConfig
-      ? deepMergeConfig(baseConfig, authorConfig)
+      ? deepMergeConfig(baseConfig, stripFrozenTypeSizes(authorConfig))
       : baseConfig;
 
     const base: VegaLiteSpec = {
@@ -101,12 +96,8 @@ export class RawChart extends VegaChart {
       ? (spec.layer as Record<string, unknown>[])
       : null;
 
-    // Layered charts (incl. annotation rule/text layers): put zoom params on
-    // the first unit layer only. Top-level `params` + multiple layers makes
-    // Vega-Lite emit duplicate selection signals (`zoomX_x`, …); vega.parse
-    // then throws and the whole chart fails to render. Layer-0 params still
-    // bind shared x/y scales (domainRaw), so pan/zoom and annotation layers
-    // move together.
+    // Layered specs: zoom params on first unit layer only (avoids duplicate
+    // zoomX_* signals when top-level params + multi-layer are combined).
     if (layers && layers.length > 0) {
       const nextLayers = layers.map((layer, i) => {
         if (i !== 0) return layer;
@@ -126,7 +117,6 @@ export class RawChart extends VegaChart {
   }
 }
 
-/** Keep author params; replace/add molplot zoom binds by name. */
 function mergeZoomParams(
   existing: unknown,
   zoom: ReturnType<typeof interactionParams>,
@@ -146,7 +136,37 @@ function mergeZoomParams(
   return [...kept, ...zoom];
 }
 
-/** Deep-merge plain config objects (arrays / scalars replaced, objects merged). */
+const FROZEN_TYPE_KEYS = new Set([
+  "titleFontSize",
+  "labelFontSize",
+  "fontSize",
+  "titleLimit",
+  "labelLimit",
+  "titlePadding",
+  "labelPadding",
+  "tickSize",
+  "symbolSize",
+  "offset",
+  "rowPadding",
+  "columnPadding",
+]);
+
+function stripFrozenTypeSizes(
+  over: Record<string, unknown>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(over)) {
+    if (key === "padding") continue;
+    if (FROZEN_TYPE_KEYS.has(key) && typeof value === "number") continue;
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      out[key] = stripFrozenTypeSizes(value as Record<string, unknown>);
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 function deepMergeConfig(
   base: Record<string, unknown>,
   over: Record<string, unknown>,
@@ -173,10 +193,6 @@ function deepMergeConfig(
   return out;
 }
 
-/**
- * Continuous x/y channels: merge top-level encoding (type/scale) with the
- * first layer that declares fields (docs layered charts often split these).
- */
 function continuousChannels(spec: VegaLiteSpec): ZoomChannel[] {
   const top = spec.encoding as
     | Record<string, { type?: string; field?: string } | undefined>
@@ -190,7 +206,6 @@ function continuousChannels(spec: VegaLiteSpec): ZoomChannel[] {
   return (["x", "y"] as const).filter((channel) => {
     const type = top?.[channel]?.type ?? layerEnc?.[channel]?.type;
     if (type === "quantitative" || type === "temporal") return true;
-    // Field on a layer + scale/type on top still counts as continuous.
     const field = top?.[channel]?.field ?? layerEnc?.[channel]?.field;
     return Boolean(field && (top?.[channel]?.type || top?.[channel]));
   });

@@ -189,7 +189,8 @@ export abstract class VegaChart {
 
   private async renderImpl(): Promise<void> {
     if (!this.embed || this.disposed) return;
-    const theme = resolveTheme(this.themeMode, this.presetName);
+    // Host element → page body type/color so docs charts match .md-typeset.
+    const theme = resolveTheme(this.themeMode, this.presetName, this.container);
     const { width, height } = this.dims();
     this.lastW = width;
     this.lastH = height;
@@ -220,10 +221,7 @@ export abstract class VegaChart {
     this.afterRender(result);
   }
 
-  /**
-   * Hook after a successful embed. Default no-op.
-   * Annotations are VL layers (see `withAnnotations`), not a post-render overlay.
-   */
+  /** Hook after a successful embed. Default no-op. */
   protected afterRender(_result: EmbedResult): void {}
 
   /**

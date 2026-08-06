@@ -62,15 +62,31 @@ describe("vegaConfig", () => {
   });
 });
 
+describe("fontScaleForHost", () => {
+  it("matches page body type (~0.95× body / 9 px paper tick)", async () => {
+    const { fontScaleForHost } = await import("../src/theme");
+    // Docs .md-typeset ≈ 12.8 px → tick target ≈ 12.2 → scale ≈ 1.35
+    const s = fontScaleForHost(560, 12.8);
+    expect(s).toBeGreaterThanOrEqual(1.15);
+    expect(s).toBeLessThanOrEqual(1.85);
+    expect(s).toBeCloseTo((12.8 * 0.95) / 9, 1);
+  });
+
+  it("nudges with width but stays within a modest band", async () => {
+    const { fontScaleForHost } = await import("../src/theme");
+    const narrow = fontScaleForHost(320, 13);
+    const wide = fontScaleForHost(800, 13);
+    expect(wide).toBeGreaterThanOrEqual(narrow);
+    expect(wide).toBeLessThanOrEqual(1.85);
+    expect(narrow).toBeGreaterThanOrEqual(1.15);
+  });
+});
+
 describe("fontScaleForWidth", () => {
-  it("is 3× paper at design width and grows with host (cap 4.5×)", async () => {
-    const { fontScaleForWidth, MOLPLOT_DESIGN_WIDTH } = await import(
+  it("delegates to fontScaleForHost with a neutral body size", async () => {
+    const { fontScaleForWidth, fontScaleForHost } = await import(
       "../src/theme"
     );
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH)).toBe(3);
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 1.2)).toBeCloseTo(3.6, 5);
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 1.8)).toBe(4.5);
-    expect(fontScaleForWidth(MOLPLOT_DESIGN_WIDTH * 3)).toBe(4.5);
-    expect(fontScaleForWidth(0)).toBe(3);
+    expect(fontScaleForWidth(560)).toBe(fontScaleForHost(560, 13));
   });
 });

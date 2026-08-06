@@ -1,18 +1,5 @@
 // Chart classes (imperative, framework-agnostic) ---------------------------
 
-// Annotations (scale bar, arrows) -----------------------------------------
-export type {
-  Annotation,
-  ArrowAnnotation,
-  ScaleBarAnnotation,
-} from "./annotations";
-export {
-  annotationLayers,
-  arrow,
-  scaleBar,
-  takeAnnotations,
-  withAnnotations,
-} from "./annotations";
 export type {
   BarChartConfig,
   BarClickEvent,
@@ -56,9 +43,13 @@ export {
 export {
   CHART_DEFAULT_COLOR,
   CHART_PALETTE,
+  CHART_SERIF_STACK,
   type ChartTheme,
+  fontScaleForHost,
   fontScaleForWidth,
+  type HostStyle,
   MOLPLOT_DESIGN_WIDTH,
+  readHostStyle,
   resolveTheme,
   vegaConfig,
 } from "./theme";

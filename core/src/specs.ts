@@ -12,7 +12,7 @@ import type { AxisConfig, LineChartConfig, ScatterChartConfig } from "./types";
  */
 export type VegaLiteSpec = Record<string, unknown>;
 
-export const VL_SCHEMA = "https://vega.github.io/schema/vega-lite/v5.json";
+export const VL_SCHEMA = "https://vega.github.io/schema/vega-lite/v6.json";
 
 export interface SpecSize {
   width?: number | "container";

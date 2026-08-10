@@ -151,7 +151,7 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
     private mount(): void {
       if (this.chart) return; // already mounted (guard double-connect)
       const surface = document.createElement("div");
-      // Render into a dedicated child so the base class's `querySelector("svg")`
+      // Render into a dedicated child so the base class's `querySelector("canvas")`
       // and ResizeObserver have a stable host — never the sibling <script>.
       surface.style.display = "block";
       surface.className = "molplot-chart__surface";

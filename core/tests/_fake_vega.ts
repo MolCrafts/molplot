@@ -6,16 +6,20 @@ export type FakeContainer = HTMLElement & { listenerCount(): number };
 /**
  * A container stub honouring the slice of the element contract `VegaChart`
  * relies on: it binds a wheel listener for axis-hover zoom and queries the
- * rendered `<svg>`. Headless runs never render, so `querySelector` returns null
- * and the handler bails. `dims()` supplies its own fallback size, so there is
- * no `getBoundingClientRect` to stub.
+ * rendered `<canvas>`. Headless runs never render, so `querySelector` returns
+ * null and the handler bails. `dims()` supplies its own fallback size, so
+ * there is no `getBoundingClientRect` to stub.
  *
  * The pointer classification itself is pure — see `axisChannelAt` — and is
  * tested directly rather than through this double.
  */
 export function makeFakeContainer(): FakeContainer {
   const listeners = new Set<EventListener>();
+  // Mutable style bag — pinHostLayout writes display/overflow/boxSizing so
+  // the host keeps a layout box under vega-embed's inline-block default.
+  const style: Record<string, string> = {};
   return {
+    style,
     addEventListener: (_type: string, fn: EventListener) => {
       listeners.add(fn);
     },
@@ -36,6 +40,7 @@ export function makeFakeContainer(): FakeContainer {
 export interface FakeVega {
   embed: VegaEmbed;
   specs: Record<string, unknown>[];
+  options: Record<string, unknown>[];
   data: Record<string, unknown[]>;
   click(datum: Record<string, unknown>): void;
   finalized: number;
@@ -44,11 +49,13 @@ export interface FakeVega {
 export function makeFakeVega(): FakeVega {
   const state: FakeVega = {
     specs: [],
+    options: [],
     data: {},
     finalized: 0,
     click: () => {},
-    embed: async (_el, spec) => {
+    embed: async (_el, spec, options) => {
       state.specs.push(spec as Record<string, unknown>);
+      state.options.push((options ?? {}) as Record<string, unknown>);
       const handlers: ((e: unknown, item: unknown) => void)[] = [];
       const view = {
         data(name: string, values?: unknown[]) {

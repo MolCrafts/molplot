@@ -3,6 +3,7 @@ import type { PresetName } from "./preset";
 import {
   interactionParams,
   type VegaLiteSpec,
+  VL_SCHEMA,
   type ZoomChannel,
 } from "./specs";
 import { type ChartTheme, fontScaleForHost, vegaConfig } from "./theme";
@@ -81,7 +82,7 @@ export class RawChart extends VegaChart {
       : baseConfig;
 
     const base: VegaLiteSpec = {
-      $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+      $schema: VL_SCHEMA,
       width: sizeHint.width,
       height,
       autosize: { type: "fit", contains: "padding" },

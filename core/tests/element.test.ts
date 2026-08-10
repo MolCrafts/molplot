@@ -120,6 +120,11 @@ describe("RawChart (the element's renderer)", () => {
     expect(drawn.params as unknown[]).toHaveLength(2);
     // Unified preset injected as config when the spec carries none.
     expect(drawn.config).toBeTruthy();
+    expect(fake.options[0]).toMatchObject({
+      actions: false,
+      renderer: "canvas",
+      tooltip: true,
+    });
     chart.dispose();
   });
 

@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "@rstest/core";
-import { parseAspect, parseInteractive, parseSpec } from "../src/element";
+import {
+  parseAspect,
+  parseInteractive,
+  parseSpec,
+  readSpec,
+} from "../src/element";
 import { RawChart } from "../src/raw_chart";
 import { __setVegaEmbedForTesting } from "../src/vega_loader";
 import {
@@ -76,6 +81,20 @@ describe("parseSpec", () => {
   });
 });
 
+describe("readSpec", () => {
+  it("distinguishes empty from invalid JSON so the error boundary can log why", () => {
+    expect(readSpec(makeHost({}))).toEqual({ spec: null, reason: "empty" });
+    expect(readSpec(makeHost({ scriptText: "   " }))).toEqual({
+      spec: null,
+      reason: "empty",
+    });
+    const bad = readSpec(makeHost({ scriptText: "{ not json }" }));
+    expect(bad.spec).toBeNull();
+    expect(bad.reason).toBe("invalid-json");
+    expect(bad.cause).toBeInstanceOf(SyntaxError);
+  });
+});
+
 describe("parseInteractive", () => {
   it("defaults to on and accepts false-like attribute values", () => {
     expect(parseInteractive(null)).toBe(true);
@@ -120,6 +139,11 @@ describe("RawChart (the element's renderer)", () => {
     expect(drawn.params as unknown[]).toHaveLength(2);
     // Unified preset injected as config when the spec carries none.
     expect(drawn.config).toBeTruthy();
+    expect(fake.options[0]).toMatchObject({
+      actions: false,
+      renderer: "canvas",
+      tooltip: true,
+    });
     chart.dispose();
   });
 
@@ -304,5 +328,23 @@ describe("RawChart (the element's renderer)", () => {
     await chart.ready();
     chart.dispose();
     expect(fake.finalized).toBe(1);
+  });
+
+  it("rejects ready() when embed throws so the element error boundary can log it", async () => {
+    __setVegaEmbedForTesting(async () => {
+      throw new Error("Duplicate signal name: zoomX_x");
+    });
+    const chart = new RawChart(container, { spec: { mark: "line" } });
+    // Attach in this turn so Node does not emit unhandledRejection before expect.
+    const failed = chart.ready().then(
+      () => {
+        throw new Error("expected ready() to reject");
+      },
+      (reason: unknown) => reason,
+    );
+    const reason = await failed;
+    expect(reason).toBeInstanceOf(Error);
+    expect((reason as Error).message).toBe("Duplicate signal name: zoomX_x");
+    chart.dispose();
   });
 });

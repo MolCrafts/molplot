@@ -30,7 +30,7 @@ from .specs import VL_SCHEMA, bar_spec, gantt_spec, line_spec, scatter_spec
 from .style import available, register, science_base, style, use
 from .vega_config import vega_config
 
-__version__ = "0.1.4"
+__version__ = "0.1.6"
 
 # Register the generated *.mplstyle files so `plt.style.use("molplot")` works.
 register()

@@ -1,3 +1,4 @@
+import { trackRender } from "./report";
 import {
   type VegaLiteSpec,
   ZOOM_EVENT_FLAG,
@@ -122,10 +123,31 @@ export abstract class VegaChart {
     this.container = container;
     this.themeMode = themeMode;
     this.presetName = presetName;
+    // Pin layout before the first embed — vega-embed injects `.vega-embed
+    // { display:inline-block; position:relative }` which would otherwise
+    // shrink-wrap the host to the SVG and break ResizeObserver on parent
+    // resizes (sidebars, dialogs, responsive cards).
+    this.pinHostLayout();
     this.mountPromise = this.mount();
     this.setupResizeObserver();
     this.detachAxisZoom = this.bindAxisHoverZoom();
     if (this.themeMode === "auto") this.setupThemeObserver();
+  }
+
+  /**
+   * Keep the host on its allocated layout box. Inline styles beat the
+   * stylesheet vega-embed injects after page CSS (same specificity, later
+   * rule would win). We only force `display` / overflow / box-sizing —
+   * position and size stay under the host author's control (absolute fill,
+   * flex child, aspect-ratio card, …).
+   */
+  private pinHostLayout(): void {
+    const { style } = this.container;
+    style.display = "block";
+    style.overflow = style.overflow || "hidden";
+    style.boxSizing = "border-box";
+    if (!style.minWidth) style.minWidth = "0";
+    if (!style.minHeight) style.minHeight = "0";
   }
 
   /** Resolves once the initial render completes. */
@@ -181,14 +203,21 @@ export abstract class VegaChart {
   protected async render(): Promise<void> {
     if (this.renderInFlight) await this.renderInFlight;
     const run = this.renderImpl();
-    this.renderInFlight = run.finally(() => {
-      if (this.renderInFlight === run) this.renderInFlight = null;
+    // Await the bookkeeping promise, not `run` alone — otherwise
+    // `run.finally(...)` is an unhandled rejection when embed throws
+    // (empty chart, no console line).
+    const tracked = run.finally(() => {
+      if (this.renderInFlight === tracked) this.renderInFlight = null;
     });
-    return run;
+    this.renderInFlight = tracked;
+    return tracked;
   }
 
   private async renderImpl(): Promise<void> {
     if (!this.embed || this.disposed) return;
+    // Re-assert after every embed: finalize/classList churn must not restore
+    // shrink-wrap and freeze the chart at the previous pixel size.
+    this.pinHostLayout();
     // Host element → page body type/color so docs charts match .md-typeset.
     const theme = resolveTheme(this.themeMode, this.presetName, this.container);
     const { width, height } = this.dims();
@@ -200,9 +229,11 @@ export abstract class VegaChart {
     this.rendered = null;
     const result = (await this.embed(this.container, spec as never, {
       actions: false,
-      renderer: "svg",
+      // Canvas only — SVG is never used (perf + consistent hit-testing).
+      renderer: "canvas",
       tooltip: true,
     })) as unknown as EmbedResult;
+    this.pinHostLayout();
     if (this.disposed) {
       result.view.finalize();
       return;
@@ -216,7 +247,7 @@ export abstract class VegaChart {
     // A spec that never went through a builder (RawChart) has no zoom params,
     // so its wheels can skip the hit test entirely.
     this.zoomable = zoomParamsOf(spec).length > 0;
-    this.rendered = this.container.querySelector("svg");
+    this.rendered = this.container.querySelector("canvas");
     this.result = result;
     this.afterRender(result);
   }
@@ -341,7 +372,7 @@ export abstract class VegaChart {
           )
         )
           return;
-        void this.render();
+        trackRender("failed to resize", this.render());
       });
     });
     this.resizeObserver.observe(this.container);
@@ -352,7 +383,7 @@ export abstract class VegaChart {
     if (typeof document === "undefined") return;
     this.themeObserver = new MutationObserver(() => {
       if (this.disposed) return;
-      void this.render();
+      trackRender("failed to re-theme", this.render());
     });
     this.themeObserver.observe(document.documentElement, {
       attributes: true,

@@ -1,5 +1,6 @@
 import type { PresetName } from "./preset";
 import { RawChart } from "./raw_chart";
+import { reportMolplotError } from "./report";
 import type { VegaLiteSpec } from "./specs";
 import type { ThemeMode } from "./types";
 
@@ -31,22 +32,37 @@ import type { ThemeMode } from "./types";
  * alternative to the script block).
  */
 
+export { reportMolplotError } from "./report";
+
+/** Outcome of reading the author-embedded Vega-Lite spec. */
+export type SpecRead =
+  | { spec: VegaLiteSpec; reason?: undefined; cause?: undefined }
+  | { spec: null; reason: "empty" | "invalid-json"; cause?: unknown };
+
 /**
- * Parse the Vega-Lite spec an author embedded in a `<molplot-chart>`. Reads the
- * first child `<script type="application/json">`; falls back to a `spec`
- * attribute holding inline JSON. Returns null when no spec is present or the
- * JSON is malformed — the element renders an inline error rather than throwing,
- * so a typo in one doc block never breaks the page.
+ * Read the Vega-Lite spec an author embedded in a `<molplot-chart>`. Prefers
+ * the first child `<script type="application/json">`, then a `spec` attribute.
+ * Distinguishes empty from malformed JSON so the error boundary can log why.
  */
-export function parseSpec(el: HTMLElement): VegaLiteSpec | null {
+export function readSpec(el: HTMLElement): SpecRead {
   const script = el.querySelector('script[type="application/json"]');
   const raw = script?.textContent ?? el.getAttribute("spec");
-  if (!raw?.trim()) return null;
+  if (!raw?.trim()) return { spec: null, reason: "empty" };
   try {
-    return JSON.parse(raw) as VegaLiteSpec;
-  } catch {
-    return null;
+    return { spec: JSON.parse(raw) as VegaLiteSpec };
+  } catch (cause) {
+    return { spec: null, reason: "invalid-json", cause };
   }
+}
+
+/**
+ * Parse the Vega-Lite spec an author embedded in a `<molplot-chart>`. Returns
+ * null when no spec is present or the JSON is malformed — the element renders
+ * an inline error rather than throwing, so a typo in one doc block never
+ * breaks the page.
+ */
+export function parseSpec(el: HTMLElement): VegaLiteSpec | null {
+  return readSpec(el).spec;
 }
 
 /** Coerce a `theme` attribute to a valid mode, defaulting to `auto`. */
@@ -131,6 +147,14 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
 
     connectedCallback(): void {
       this.setAttribute("data-molplot-chart", "");
+      // Theme embeds-guard may have stamped a load-failure banner before
+      // this element upgraded. Drop it so a working chart is not covered.
+      this.removeAttribute("data-molcrafts-embed-error");
+      for (const box of Array.from(
+        this.querySelectorAll("[data-molcrafts-embed-error-msg]"),
+      )) {
+        box.remove();
+      }
       this.applySizing();
       this.mount();
     }
@@ -151,17 +175,20 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
     private mount(): void {
       if (this.chart) return; // already mounted (guard double-connect)
       const surface = document.createElement("div");
-      // Render into a dedicated child so the base class's `querySelector("svg")`
+      // Render into a dedicated child so the base class's `querySelector("canvas")`
       // and ResizeObserver have a stable host — never the sibling <script>.
       surface.style.display = "block";
       surface.className = "molplot-chart__surface";
       this.appendChild(surface);
       this.surface = surface;
 
-      const spec = parseSpec(this);
-      if (!spec) {
-        surface.textContent =
-          "molplot-chart: missing or invalid Vega-Lite spec";
+      const parsed = readSpec(this);
+      if (!parsed.spec) {
+        const message =
+          parsed.reason === "empty"
+            ? "missing Vega-Lite spec (empty JSON script / spec attribute)"
+            : "invalid Vega-Lite JSON";
+        this.fail(parsed.cause ?? new Error(message), message);
         return;
       }
       const preset =
@@ -169,16 +196,41 @@ export function defineMolplotChart(tag = "molplot-chart"): void {
       const theme = parseTheme(this.getAttribute("theme"));
       const interactive = parseInteractive(this.getAttribute("interactive"));
       const aspectRatio = parseAspect(this.getAttribute("aspect"));
+      this.dataset.state = "loading";
       this.chart = new RawChart(surface, {
-        spec,
+        spec: parsed.spec,
         preset,
         theme,
         interactive,
         aspectRatio,
       });
-      void this.chart.ready().then(() => {
-        if (this.chart) this.dispatchEvent(new CustomEvent("molplot:ready"));
-      });
+      void this.chart.ready().then(
+        () => {
+          if (!this.chart) return;
+          this.dataset.state = "ready";
+          this.dispatchEvent(
+            new CustomEvent("molplot:ready", { bubbles: true, composed: true }),
+          );
+        },
+        (cause: unknown) => {
+          this.fail(cause, "failed to render");
+        },
+      );
+    }
+
+    private fail(cause: unknown, scope: string): void {
+      const error = reportMolplotError(scope, cause, this);
+      this.dataset.state = "error";
+      if (this.surface) {
+        this.surface.textContent = `molplot-chart: ${error.message}`;
+      }
+      this.dispatchEvent(
+        new CustomEvent("molplot:error", {
+          detail: { error },
+          bubbles: true,
+          composed: true,
+        }),
+      );
     }
 
     private teardown(): void {

@@ -55,7 +55,7 @@ describe("lineSpec", () => {
     const spec = S(
       lineSpec({ series: [{ id: "a", label: "A" }] }, light, { height: 200 }),
     );
-    expect(spec.$schema).toContain("vega-lite/v5");
+    expect(spec.$schema).toContain("vega-lite/v6");
     expect(spec.data).toEqual({ name: "table" });
     expect(spec.height).toBe(200);
     // The unified preset is injected as the Vega-Lite config.

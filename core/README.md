@@ -6,9 +6,10 @@ Vega runtime.
 
 Part of [MolPlot](https://github.com/MolCrafts/molplot): every chart builds a
 **Vega-Lite spec** (the portable intermediate language) and renders it with
-`vega-embed`. The same spec can be rendered to a matplotlib figure by the Python
-package `molcrafts-molplot`, so web and paper figures share one description and
-one preset.
+`vega-embed` using its Canvas renderer. The web package does not emit SVG. The
+same spec can be rendered to a matplotlib figure by the Python package
+`molcrafts-molplot`, so web and paper figures share one description and one
+preset.
 
 ## Install
 

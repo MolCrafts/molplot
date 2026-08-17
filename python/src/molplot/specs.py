@@ -24,7 +24,7 @@ __all__ = [
     "ZOOM_EVENT_FLAG",
 ]
 
-VL_SCHEMA = "https://vega.github.io/schema/vega-lite/v5.json"
+VL_SCHEMA = "https://vega.github.io/schema/vega-lite/v6.json"
 _FALLBACK_STATUS = "#a3a3a3"
 
 #: One scale-bound interval selection per zoomable axis.

@@ -79,6 +79,17 @@ describe("LineChart", () => {
     chart.dispose();
   });
 
+  it("pins the host to display:block so ResizeObserver tracks the layout box", async () => {
+    const chart = new LineChart(container, { series: [{ id: "a" }] });
+    await chart.ready();
+    // Survives embed: vega-embed would otherwise set display:inline-block via
+    // its injected stylesheet and freeze the chart at the first SVG size.
+    expect(container.style.display).toBe("block");
+    expect(container.style.overflow).toBe("hidden");
+    expect(container.style.boxSizing).toBe("border-box");
+    chart.dispose();
+  });
+
   it("finalizes the view on dispose", async () => {
     const chart = new LineChart(container, { series: [{ id: "a" }] });
     await chart.ready();

@@ -10,7 +10,7 @@ def test_line_spec_shape_and_config():
         [{"id": "a", "label": "A", "x": [0, 1], "y": [1, 2]}],
         show_legend=True,
     )
-    assert spec["$schema"].endswith("vega-lite/v5.json")
+    assert spec["$schema"].endswith("vega-lite/v6.json")
     assert spec["data"]["values"][0] == {"s": "a", "key": "A", "i": 0, "x": 0, "y": 1}
     # Unified preset injected as the VL config.
     assert spec["config"]["range"]["category"][0] == "#0c5da5"

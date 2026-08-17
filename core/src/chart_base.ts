@@ -1,3 +1,4 @@
+import { trackRender } from "./report";
 import {
   type VegaLiteSpec,
   ZOOM_EVENT_FLAG,
@@ -202,10 +203,14 @@ export abstract class VegaChart {
   protected async render(): Promise<void> {
     if (this.renderInFlight) await this.renderInFlight;
     const run = this.renderImpl();
-    this.renderInFlight = run.finally(() => {
-      if (this.renderInFlight === run) this.renderInFlight = null;
+    // Await the bookkeeping promise, not `run` alone — otherwise
+    // `run.finally(...)` is an unhandled rejection when embed throws
+    // (empty chart, no console line).
+    const tracked = run.finally(() => {
+      if (this.renderInFlight === tracked) this.renderInFlight = null;
     });
-    return run;
+    this.renderInFlight = tracked;
+    return tracked;
   }
 
   private async renderImpl(): Promise<void> {
@@ -367,7 +372,7 @@ export abstract class VegaChart {
           )
         )
           return;
-        void this.render();
+        trackRender("failed to resize", this.render());
       });
     });
     this.resizeObserver.observe(this.container);
@@ -378,7 +383,7 @@ export abstract class VegaChart {
     if (typeof document === "undefined") return;
     this.themeObserver = new MutationObserver(() => {
       if (this.disposed) return;
-      void this.render();
+      trackRender("failed to re-theme", this.render());
     });
     this.themeObserver.observe(document.documentElement, {
       attributes: true,

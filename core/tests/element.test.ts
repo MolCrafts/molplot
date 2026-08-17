@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from "@rstest/core";
-import { parseAspect, parseInteractive, parseSpec } from "../src/element";
+import {
+  parseAspect,
+  parseInteractive,
+  parseSpec,
+  readSpec,
+} from "../src/element";
 import { RawChart } from "../src/raw_chart";
 import { __setVegaEmbedForTesting } from "../src/vega_loader";
 import {
@@ -73,6 +78,20 @@ describe("parseSpec", () => {
     expect(parseSpec(makeHost({}))).toBeNull();
     expect(parseSpec(makeHost({ scriptText: "   " }))).toBeNull();
     expect(parseSpec(makeHost({ scriptText: "{ not json }" }))).toBeNull();
+  });
+});
+
+describe("readSpec", () => {
+  it("distinguishes empty from invalid JSON so the error boundary can log why", () => {
+    expect(readSpec(makeHost({}))).toEqual({ spec: null, reason: "empty" });
+    expect(readSpec(makeHost({ scriptText: "   " }))).toEqual({
+      spec: null,
+      reason: "empty",
+    });
+    const bad = readSpec(makeHost({ scriptText: "{ not json }" }));
+    expect(bad.spec).toBeNull();
+    expect(bad.reason).toBe("invalid-json");
+    expect(bad.cause).toBeInstanceOf(SyntaxError);
   });
 });
 
@@ -309,5 +328,23 @@ describe("RawChart (the element's renderer)", () => {
     await chart.ready();
     chart.dispose();
     expect(fake.finalized).toBe(1);
+  });
+
+  it("rejects ready() when embed throws so the element error boundary can log it", async () => {
+    __setVegaEmbedForTesting(async () => {
+      throw new Error("Duplicate signal name: zoomX_x");
+    });
+    const chart = new RawChart(container, { spec: { mark: "line" } });
+    // Attach in this turn so Node does not emit unhandledRejection before expect.
+    const failed = chart.ready().then(
+      () => {
+        throw new Error("expected ready() to reject");
+      },
+      (reason: unknown) => reason,
+    );
+    const reason = await failed;
+    expect(reason).toBeInstanceOf(Error);
+    expect((reason as Error).message).toBe("Duplicate signal name: zoomX_x");
+    chart.dispose();
   });
 });

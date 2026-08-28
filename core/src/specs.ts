@@ -16,7 +16,7 @@ export const VL_SCHEMA = "https://vega.github.io/schema/vega-lite/v6.json";
 
 export interface SpecSize {
   width?: number | "container";
-  height?: number;
+  height?: number | "container";
 }
 
 const FALLBACK_STATUS_COLOR = "#a3a3a3";

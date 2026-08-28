@@ -59,12 +59,28 @@ export class LineChart extends VegaChart {
     if (points.length === 0) return;
     const buf = this.buffers.get(id);
     if (!buf) throw new Error(`LineChart: unknown series ${id}`);
+    const series = this.seriesConfigs.get(id);
+    const key = series?.label ?? id;
+    const start = buf.x.length;
     for (const p of points) {
       buf.x.push(p.x);
       buf.y.push(p.y);
     }
-    this.trim(buf);
-    await this.setData("table", this.rows());
+    if (this.windowSize !== null && buf.x.length > this.windowSize) {
+      this.trim(buf);
+      await this.setData("table", this.rows());
+      return;
+    }
+    const rows = points.map((p, offset) => ({
+      s: id,
+      key,
+      i: start + offset,
+      x: p.x,
+      y: p.y,
+    }));
+    if (!(await this.insertData("table", rows))) {
+      await this.setData("table", this.rows());
+    }
   }
 
   async clear(id?: string): Promise<void> {
@@ -132,9 +148,17 @@ export class LineChart extends VegaChart {
 
   protected buildSpec(
     theme: ChartTheme,
-    sizeHint: { width: number; height: number },
+    _sizeHint: { width: number; height: number },
   ): VegaLiteSpec {
-    return lineSpec(this.config, theme, sizeHint);
+    return lineSpec(this.config, theme, {
+      width: "container",
+      height: "container",
+    });
+  }
+
+  /** Width and height are `"container"` — never re-embed just because the box changed. */
+  protected resizeChanged(): boolean {
+    return false;
   }
 
   protected onDatum(datum: Record<string, unknown>): void {

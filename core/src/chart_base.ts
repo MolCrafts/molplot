@@ -26,6 +26,8 @@ interface SceneItem {
 export interface EmbedResult {
   view: {
     data(name: string, values?: unknown[]): unknown;
+    /** Incremental insert; does not rebuild the dataset. */
+    insert(name: string, tuples: unknown[]): unknown;
     resize(): { run(): unknown };
     run(): unknown;
     /** Top-left of the plot rectangle within the rendered element. */
@@ -216,7 +218,10 @@ export abstract class VegaChart {
     // A spec that never went through a builder (RawChart) has no zoom params,
     // so its wheels can skip the hit test entirely.
     this.zoomable = zoomParamsOf(spec).length > 0;
-    this.rendered = this.container.querySelector("svg");
+    // Hit-test against the Vega container, not an inner SVG. Container mode
+    // is the only interaction surface: canvas and SVG both live inside it,
+    // and `view.origin()` is relative to this element.
+    this.rendered = this.container;
     this.result = result;
     this.afterRender(result);
   }
@@ -288,6 +293,21 @@ export abstract class VegaChart {
     if (changed) result.view.resize().run();
   }
 
+  /** Insert tuples without rebuilding the dataset. False if the view cannot insert. */
+  protected async insertData(name: string, rows: unknown[]): Promise<boolean> {
+    if (rows.length === 0) return true;
+    await this.mountPromise;
+    if (this.disposed) return false;
+    if (!this.result) return false;
+    try {
+      this.result.view.insert(name, rows);
+      this.result.view.run();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   /** Cheap in-place data swap (streaming path); re-embeds if no live view. */
   protected async setData(name: string, rows: unknown[]): Promise<void> {
     await this.mountPromise;
@@ -334,14 +354,16 @@ export abstract class VegaChart {
         this.resizeRaf = null;
         if (this.disposed) return;
         const { width, height } = this.dims();
-        if (
-          !this.resizeChanged(
-            { width: this.lastW, height: this.lastH },
-            { width, height },
-          )
-        )
+        const previous = { width: this.lastW, height: this.lastH };
+        this.lastW = width;
+        this.lastH = height;
+        if (this.resizeChanged(previous, { width, height })) {
+          void this.render();
           return;
-        void this.render();
+        }
+        // Container-width specs: tell Vega the box changed without re-embed
+        // so pan/zoom domain stays put.
+        this.result?.view.resize().run();
       });
     });
     this.resizeObserver.observe(this.container);

@@ -11,6 +11,7 @@
     "page"
   ],
   "scripts": {
+    "prepare": "node -e \"process.exit(process.env.CI ? 0 : 1)\" || pre-commit install --hook-type pre-commit --hook-type pre-push",
     "build:presets": "node scripts/build-presets.mjs",
     "check:presets": "node scripts/build-presets.mjs --check",
     "build:schema": "node scripts/build-schema.mjs",

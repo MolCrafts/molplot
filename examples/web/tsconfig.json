@@ -1,0 +1,11 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "types": ["react", "react-dom"],
+    "paths": {
+      "@molcrafts/molplot": ["../../core/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,179 @@
+/* MolPlot product stylesheet.
+ *
+ * Constitution: ./constitution-theme.css + ./constitution-base.css
+ * (synced from molcrafts-ui). Brand palette stays here.
+ */
+@import "tailwindcss";
+@import "./constitution-theme.css";
+@import "./constitution-base.css";
+
+@theme inline {
+  --color-canvas: var(--molplot-canvas);
+  --color-paper: var(--molplot-paper);
+  --color-panel: var(--molplot-panel);
+  --color-surface: var(--molplot-raised);
+  --color-background: var(--molplot-panel);
+  --color-foreground: var(--molplot-foreground);
+  --color-muted-foreground: var(--molplot-muted-foreground);
+  --color-subtle-foreground: var(--molplot-subtle-foreground);
+  --color-border: var(--molplot-border);
+  --color-input: var(--molplot-input);
+  --color-ring: var(--molplot-accent);
+  --color-accent: var(--molplot-accent);
+  --color-accent-hover: var(--molplot-accent-hover);
+  --color-accent-foreground: var(--molplot-accent-foreground);
+  --color-accent-soft: var(--molplot-soft);
+  --color-interactive: var(--molplot-interactive);
+  --color-interactive-foreground: var(--molplot-interactive-foreground);
+  --color-primary: var(--molplot-accent);
+  --color-primary-foreground: var(--molplot-accent-foreground);
+  --color-secondary: var(--molplot-raised);
+  --color-secondary-foreground: var(--molplot-foreground);
+  --color-muted: var(--molplot-raised);
+  --color-card: var(--molplot-raised);
+  --color-card-foreground: var(--molplot-foreground);
+  --color-popover: var(--molplot-panel);
+  --color-popover-foreground: var(--molplot-foreground);
+  --color-status-draft: var(--status-draft);
+  --color-status-ready: var(--status-ready);
+  --color-status-queued: var(--status-queued);
+  --color-status-running: var(--status-running);
+  --color-status-completed: var(--status-completed);
+  --color-status-failed: var(--status-failed);
+  --color-status-failed-hover: var(--status-failed-hover);
+  --color-status-cancelled: var(--status-cancelled);
+  --color-status-cached: var(--status-cached);
+  --color-status-warning: var(--status-warning);
+  --color-status-ready-foreground: var(--status-ready-foreground);
+  --color-status-running-foreground: var(--status-running-foreground);
+  --color-status-completed-foreground: var(--status-completed-foreground);
+  --color-status-failed-foreground: var(--status-failed-foreground);
+  --color-status-warning-foreground: var(--status-warning-foreground);
+  --color-status-running-soft: var(--status-running-soft);
+  --color-status-completed-soft: var(--status-completed-soft);
+  --color-status-failed-soft: var(--status-failed-soft);
+  --color-status-warning-soft: var(--status-warning-soft);
+  --color-destructive: var(--status-failed);
+  --color-destructive-foreground: var(--molplot-accent-foreground);
+  --color-success: var(--status-completed);
+  --color-success-foreground: var(--status-completed-foreground);
+  --color-success-soft: var(--status-completed-soft);
+  --color-warning: var(--status-warning);
+  --color-warning-foreground: var(--status-warning-foreground);
+  --color-warning-soft: var(--status-warning-soft);
+  --color-info: var(--molplot-accent);
+  --color-info-foreground: var(--molplot-muted-foreground);
+  --shadow-overlay: var(--molplot-shadow-overlay);
+}
+
+@layer base {
+  :where(:root, :host) {
+    color-scheme: light;
+    --molplot-canvas: #f1f4f7;
+    --molplot-panel: #f9fafc;
+    --molplot-raised: #e9edf2;
+    --molplot-paper: #ffffff;
+    --molplot-foreground: #161b22;
+    --molplot-muted-foreground: #515962;
+    --molplot-subtle-foreground: #6b7380;
+    --molplot-border: #c4cbd4;
+    --molplot-input: #c4cbd4;
+    --molplot-accent: #007d7e;
+    --molplot-accent-hover: #006667;
+    --molplot-accent-foreground: #f9fafc;
+    --molplot-soft: #e3f2f2;
+    --molplot-interactive: #e9edf2;
+    --molplot-interactive-foreground: #161b22;
+    --constitution-surface: var(--molplot-panel);
+    --molplot-shadow-overlay: 0 0.75rem 2rem oklch(0.12 0.01 255 / 18%);
+    --tooltip-arrow-offset: calc(-50% - 2px);
+  }
+
+  :where(.dark, :host(.dark)) {
+    color-scheme: dark;
+    --molplot-canvas: oklch(0.22 0.012 210);
+    --molplot-panel: oklch(0.26 0.012 210);
+    --molplot-raised: oklch(0.32 0.012 210);
+    --molplot-paper: oklch(0.2 0.01 210);
+    --molplot-foreground: oklch(0.93 0.01 210);
+    --molplot-muted-foreground: oklch(0.72 0.015 210);
+    --molplot-subtle-foreground: oklch(0.64 0.014 210);
+    --molplot-border: oklch(1 0 0 / 12%);
+    --molplot-input: oklch(1 0 0 / 15%);
+    --molplot-accent: oklch(0.62 0.09 195);
+    --molplot-accent-hover: oklch(0.68 0.09 195);
+    --molplot-accent-foreground: oklch(0.16 0.02 195);
+    --molplot-soft: color-mix(in oklab, var(--molplot-accent) 16%, var(--molplot-panel));
+    --molplot-interactive: oklch(0.34 0.012 210);
+    --molplot-interactive-foreground: oklch(0.93 0.01 210);
+    --molplot-shadow-overlay: 0 0.75rem 2rem oklch(0.04 0.01 210 / 46%);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  :where(body, :host) {
+    @apply bg-background text-foreground font-sans text-body;
+  }
+}
+
+.mol-motion-popup {
+  --motion-popup-x: 0;
+  --motion-popup-y: 0;
+}
+
+.mol-motion-popup[data-side="bottom"] {
+  --motion-popup-y: -4px;
+}
+
+.mol-motion-popup[data-side="left"] {
+  --motion-popup-x: 4px;
+}
+
+.mol-motion-popup[data-side="right"] {
+  --motion-popup-x: -4px;
+}
+
+.mol-motion-popup[data-side="top"] {
+  --motion-popup-y: 4px;
+}
+
+.mol-motion-popup:is(
+  [data-state="open"],
+  [data-state="instant-open"],
+  [data-state="delayed-open"]
+) {
+  animation: molplot-popup-in var(--motion-fast) var(--motion-ease) both;
+}
+
+.mol-motion-popup[data-state="closed"] {
+  animation: molplot-popup-out var(--motion-fast) var(--motion-ease) both;
+}
+
+@keyframes molplot-popup-in {
+  from {
+    opacity: 0;
+    translate: var(--motion-popup-x) var(--motion-popup-y);
+    scale: 0.98;
+  }
+}
+
+@keyframes molplot-popup-out {
+  to {
+    opacity: 0;
+    translate: var(--motion-popup-x) var(--motion-popup-y);
+    scale: 0.98;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mol-motion-popup:is(
+    [data-state="open"],
+    [data-state="instant-open"],
+    [data-state="delayed-open"],
+    [data-state="closed"]
+  ) {
+    animation: none;
+  }
+}

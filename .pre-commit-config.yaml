@@ -13,9 +13,16 @@ repos:
         pass_filenames: false
         stages: [pre-commit]
 
+      - id: schema-drift
+        name: editor schema in sync (build-schema --check)
+        entry: npm run check:schema
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
       - id: biome
         name: biome check
-        entry: npx biome check
+        entry: npm run check:biome
         language: system
         pass_filenames: false
         stages: [pre-commit]

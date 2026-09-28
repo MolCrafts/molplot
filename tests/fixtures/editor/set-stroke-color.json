@@ -1,0 +1,9 @@
+{
+  "select": { "role": "series", "index": 0 },
+  "command": {
+    "type": "set",
+    "component": "stroke",
+    "property": "color",
+    "value": "#cc0000"
+  }
+}

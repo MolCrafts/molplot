@@ -8,24 +8,34 @@ copyright = "Copyright &copy; 2026 MolCrafts"
 docs_dir = "docs"
 site_dir = "site"
 
-# Load the self-registering `<molplot-chart>` Web Component (the `elements`
-# bundle of @molcrafts/molplot). It registers the custom element cheaply; the
-# vega runtime is a lazy chunk that downloads only when a chart mounts. This is
-# what makes the `<molplot-chart>` element and the ```molplot fence render live.
+# Live `<molplot-chart>` / ```molplot fences bootstrap from this repo's source
+# build (`npm run build:docs-assets` → docs/assets/molplot/elements.js), not
+# from a published CDN copy. Vega stays a lazy chunk of that bundle. Do not
+# set extra.molcrafts.enable_molplot here: that flag falls back to jsDelivr
+# and would hide a missing local build.
+watch = ["docs/assets/molplot"]
 extra_javascript = [
-  { path = "https://cdn.jsdelivr.net/npm/@molcrafts/molplot@latest/dist/elements.js", type = "module" },
+  { path = "assets/molplot/elements.js", type = "module" },
+  "https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js",
 ]
+extra_css = ["stylesheets/extra.css"]
 
 nav = [
   { "Home" = "index.md" },
-  { "Getting Started" = "getting-started/index.md" },
-  { "Unified Preset" = [
-    "getting-started/preset.md",
-    { "Web (Vega-Lite)" = "getting-started/web.md" },
-    { "Python (scienceplots)" = "getting-started/python.md" },
-    { "Charts in Markdown" = "getting-started/markdown.md" },
+  { "Getting Started" = [
+    "getting-started/index.md",
+    { "Preset" = "getting-started/preset.md" },
+    { "Web" = "getting-started/web.md" },
+    { "Python" = "getting-started/python.md" },
+    { "Markdown" = "getting-started/markdown.md" },
+    { "Workbench" = "getting-started/workbench.md" },
   ] },
-  { "API Reference" = "api/index.md" },
+  { "Gallery" = "getting-started/gallery.md" },
+  { "API Reference" = [
+    "api/index.md",
+    { "TypeScript" = "api/typescript.md" },
+    { "Python" = "api/python.md" },
+  ] },
 ]
 
 # Markdown extensions. Declaring this section REPLACES Zensical's built-in

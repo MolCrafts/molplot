@@ -1,45 +1,47 @@
-# Python (scienceplots)
+# Python
+
+You already have matplotlib. What is missing is a look that matches the web
+pane, and a way to hand the same chart to the browser without redrawing it.
 
 ```sh
 pip install molcrafts-molplot
-pip install "molcrafts-molplot[convert]"   # optional exact web-parity export
 ```
 
-## Style
-
-`use()` / `style()` apply the scienceplots base styles named by the preset and
-overlay the MolPlot tokens, so a scienceplots figure gets the unified palette,
-type scale, and grid.
+`use()` puts the shared palette and type on matplotlib (and the scienceplots
+base the preset names). Then one call draws a figure:
 
 ```python
-import matplotlib.pyplot as plt
 import molplot
 
-molplot.use("molplot")                 # persistent
-molplot.use("molplot-paper")           # serif, high-DPI, 'nature' base
-with molplot.style("molplot", mode="dark"):
-    plt.plot(x, y)                     # scoped; restores on exit
+molplot.use("molplot")
 
-molplot.palette()[0]                   # '#0c5da5' — same colours as the web
+fig, ax = molplot.line(
+    [{"id": "A", "x": t, "y": conv}],
+    x_label="x",
+    y_label="y",
+    show_legend=True,
+)
 ```
 
-`plt.style.use("molplot")` also works directly (the `.mplstyle` files register
-on import), without the scienceplots base.
+`molplot-paper` is the journal variant. A `with molplot.style(...)` block
+applies a look only inside the block.
 
-## Charts and the portable spec
+Scatter, bar, and Gantt are the same shape of call. When you want a description
+you can ship to the browser, build it first and then render:
 
 ```python
-# one call → (fig, ax)
-fig, ax = molplot.bar(
-    ["Q1", "Q2"], [{"id": "ok", "values": [8, 9]}, {"id": "fail", "values": [1, 2]}],
-    mode_="stack", show_legend=True,
-)
-
-# or build the Vega-Lite spec, then choose a renderer
 spec = molplot.scatter_spec(pc1, pc2, color=cluster, colorscale="viridis")
-fig, ax = molplot.render(spec)         # matplotlib (scienceplots)
-molplot.to_png(spec, "fig.png")        # exact web parity via vl-convert (optional)
+fig, ax = molplot.render(spec)
 ```
 
-`line_spec` / `scatter_spec` / `bar_spec` / `gantt_spec` emit the same Vega-Lite
-shapes as the TypeScript builders — the spec is the interchange format.
+Exact web pixels (optional): `pip install "molcrafts-molplot[convert]"`, then
+`molplot.to_png(spec, "fig.png")`.
+
+To inspect an existing matplotlib script instead of rewriting it, open the
+[workbench](workbench.md):
+
+```sh
+molplot serve script.py
+```
+
+Names and options: [API](../api/python.md).

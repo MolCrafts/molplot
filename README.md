@@ -98,7 +98,7 @@ fenced blocks on that site are compiled from `core/`
 
 ```bash
 # local preview — compiles core/dist/elements.js then serves docs
-pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.2.5"
+pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.3.0"
 npm run docs
 ```
 

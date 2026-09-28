@@ -46,7 +46,7 @@ dev = [
 [dependency-groups]
 doc = [
     "zensical>=0.0.53",
-    "molcrafts-zensical-theme>=0.2.5",
+    "molcrafts-zensical-theme>=0.3.0",
     "molcrafts-molplot",
 ]
 

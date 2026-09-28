@@ -97,7 +97,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install zensical + theme
-        run: pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.2.5"
+        run: |
+          python -m pip install -U pip
+          pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.3.0"
       - name: Build docs from source-compiled elements.js
         run: npm run docs:build
       - name: Docs must not load the molplot CDN

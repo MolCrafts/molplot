@@ -17,6 +17,8 @@ jobs:
       - run: npm install
       - name: Presets in sync (single source of truth)
         run: npm run check:presets
+      - name: Editor schema in sync
+        run: npm run check:schema
 
   lint:
     runs-on: ubuntu-latest
@@ -27,7 +29,7 @@ jobs:
           node-version: 22
       - run: npm install
       - name: Biome lint & format check
-        run: npx biome check
+        run: npm run check:biome
 
   typecheck:
     runs-on: ubuntu-latest
@@ -71,8 +73,8 @@ jobs:
         with:
           node-version: 22
       - run: npm install
-      - name: Sync generated presets
-        run: npm run build:presets
+      - name: Sync generated presets and editor schema
+        run: npm run build:presets && npm run build:schema
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -82,6 +84,31 @@ jobs:
       - name: Test python (pytest)
         run: python -m pytest -q
         working-directory: python
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install zensical + theme
+        run: pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.2.5"
+      - name: Build docs from source-compiled elements.js
+        run: npm run docs:build
+      - name: Docs must not load the molplot CDN
+        run: |
+          test -f docs/assets/molplot/elements.js
+          test -f site/assets/molplot/elements.js
+          grep -q 'src="./assets/molplot/elements.js"' site/index.html
+          if grep -R -E '<script[^>]+src="https://cdn.jsdelivr.net/npm/@molcrafts/molplot' site --include='*.html'; then
+            echo "docs site still loads the molplot CDN as a script" >&2
+            exit 1
+          fi
 
   build-python:
     runs-on: ubuntu-latest

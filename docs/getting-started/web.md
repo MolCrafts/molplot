@@ -1,53 +1,37 @@
-# Web (Vega-Lite)
+# Web
+
+A paper figure is static. A dashboard pane has to move: new points arrive,
+someone clicks a trace, the page goes dark. That is the web package.
 
 ```sh
-npm install @molcrafts/molplot vega vega-lite vega-embed
+npm install @molcrafts/molplot
 ```
 
-Every chart is an imperative class taking `(container, config)`. The Vega
-runtime loads lazily, so nothing ships until you draw a chart.
+A line you can keep adding points to:
 
 ```ts
 import { LineChart } from "@molcrafts/molplot";
 
 const chart = new LineChart(el, {
-  preset: "molplot",        // unified preset
-  theme: "auto",            // tracks <html class="dark">
   showLegend: true,
-  xAxis: { label: "step" },
-  yAxis: { label: "energy" },
-  series: [{ id: "e", label: "Energy", initialPoints: [{ x: 0, y: 1 }] }],
+  xAxis: { label: "x" },
+  yAxis: { label: "y" },
+  series: [{ id: "a", label: "A", initialPoints: [{ x: 0, y: 1 }] }],
 });
-
 await chart.ready();
-chart.appendPoint("e", { x: 1, y: 2 });   // cheap streaming update
-const off = chart.onPointClick((e) => console.log(e.seriesId, e.index));
-// ...
-off();
-chart.dispose();
+await chart.appendPoint("a", { x: 1, y: 2 });
 ```
 
-## Charts
+Dark mode follows the page. Drag to pan; wheel an axis to zoom.
 
-| Class | Purpose | Key methods |
-|-------|---------|-------------|
-| `LineChart` | streaming time series | `setSeries`, `appendPoint(s)`, `clear`, `setWindow`, `setAxisRange`, `onPointClick` |
-| `ScatterChart` | points + highlight + colour channel | `update`, `setHighlight`, `onPointClick` |
-| `BarChart` | stack / group / overlay, v/h, line-over-bars | `update`, `onBarClick` |
-| `GanttChart` | time-spanning bars by status group | `update`, `onTaskClick` |
-| `RawChart` | render an arbitrary Vega-Lite spec | `update({ spec })` |
+Scatter, bar, and Gantt follow the same rhythm: create, wait until ready,
+update or listen for clicks. For a chart with no framework, register the
+element and drop it in HTML:
 
-## Web Component
+```ts
+import "@molcrafts/molplot/elements";
+```
 
-The self-registering `@molcrafts/molplot/elements` bundle provides a compact
-`<molplot-chart>` with a 4:3 default aspect ratio. Scale-bound pan and zoom are
-enabled by default for quantitative and temporal axes. Set
-`interactive="false"` to render a static chart. Low-specificity component CSS
-keeps the default width at or below `28rem` with compact padding, while allowing
-host styles to override every default.
+A playground that reloads from source: `npm run example:web`.
 
-## Spec builders
-
-Need the spec without a DOM (SSR, tests, shipping to Python)? Use the pure
-builders: `lineSpec`, `scatterSpec`, `barSpec`, `ganttSpec` — each returns a
-Vega-Lite spec with the unified preset injected as `config`.
+Names and options: [API](../api/typescript.md).

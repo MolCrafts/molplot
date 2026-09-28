@@ -71,7 +71,14 @@ export class ScatterChart extends VegaChart {
     theme: ChartTheme,
     sizeHint: { width: number; height: number },
   ): VegaLiteSpec {
-    return scatterSpec(this.config, theme, sizeHint);
+    return scatterSpec(this.config, theme, {
+      width: "container",
+      height: sizeHint.height,
+    });
+  }
+
+  protected resizeChanged(): boolean {
+    return false;
   }
 
   protected onDatum(datum: Record<string, unknown>): void {

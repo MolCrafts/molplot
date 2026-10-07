@@ -1,10 +1,9 @@
 name: release
 
-# A v* tag re-runs lint and the tests on the tagged tree, checks the tag
-# against both package versions, builds, and (MolCrafts only) publishes
-# @molcrafts/molplot to npm and molcrafts-molplot to PyPI, both by trusted
-# publishing, then opens the GitHub release. workflow_dispatch is the dry
-# run: everything but the uploads.
+# A v* tag on MolCrafts/molplot: guard (the tag is both package versions) ->
+# lint + the full test tier -> build -> @molcrafts/molplot to npm and
+# molcrafts-molplot to PyPI (both trusted publishing) -> the GitHub release.
+# A dispatch is the dry run, fork or upstream: everything but the uploads.
 on:
   push:
     tags: ["v*"]
@@ -18,10 +17,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  guard:
+    name: release / guard
+    if: github.event_name == 'workflow_dispatch' || github.repository_owner == 'MolCrafts'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag is both package versions
+        if: github.event_name == 'push'
+        run: |
+          core=$(node -p "require('./core/package.json').version")
+          python=$(python3 -c 'import tomllib; print(tomllib.load(open("python/pyproject.toml", "rb"))["project"]["version"])')
+          for version in "$core" "$python"; do
+            [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "::error::tag $GITHUB_REF_NAME is not core $core / python $python"; exit 1; }
+          done
+
   lint:
+    needs: guard
     uses: ./.github/workflows/lint.yml
 
   test:
+    needs: guard
     uses: ./.github/workflows/test.yml
 
   build:
@@ -30,18 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-python
-      - name: Tag matches both package versions
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          core=$(node -p "require('./core/package.json').version")
-          python=$(uv version --short --project python)
-          for version in "$core" "$python"; do
-            if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
-              echo "::error::tag ${GITHUB_REF_NAME} does not match core ${core} / python ${python}"
-              exit 1
-            fi
-          done
+      - uses: MolCrafts/molcrafts-ci/actions/setup-python@master
       - run: uv build python
       - run: uvx twine check --strict python/dist/*
       - uses: actions/upload-artifact@v7
@@ -52,7 +57,7 @@ jobs:
   npm:
     name: release / npm
     needs: build
-    if: github.repository_owner == 'MolCrafts' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.repository_owner == 'MolCrafts'
     runs-on: ubuntu-latest
     environment: release-core
     permissions:
@@ -60,7 +65,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      - uses: ./.github/actions/setup-node
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@master
         with:
           registry-url: https://registry.npmjs.org
       # npm 11.5+ is the minimum for OIDC trusted publishing; .nvmrc's Node
@@ -80,7 +85,7 @@ jobs:
   pypi:
     name: release / pypi
     needs: build
-    if: github.repository_owner == 'MolCrafts' && startsWith(github.ref, 'refs/tags/v')
+    if: github.event_name == 'push' && github.repository_owner == 'MolCrafts'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -97,6 +102,7 @@ jobs:
   github:
     name: release / github
     needs: [npm, pypi]
+    if: github.event_name == 'push' && github.repository_owner == 'MolCrafts'
     runs-on: ubuntu-latest
     permissions:
       contents: write

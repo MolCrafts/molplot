@@ -1,0 +1,113 @@
+name: release
+
+# A v* tag re-runs lint and the tests on the tagged tree, checks the tag
+# against both package versions, builds, and (MolCrafts only) publishes
+# @molcrafts/molplot to npm and molcrafts-molplot to PyPI, both by trusted
+# publishing, then opens the GitHub release. workflow_dispatch is the dry
+# run: everything but the uploads.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    uses: ./.github/workflows/test.yml
+
+  build:
+    name: release / build
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-python
+      - name: Tag matches both package versions
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          core=$(node -p "require('./core/package.json').version")
+          python=$(uv version --short --project python)
+          for version in "$core" "$python"; do
+            if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+              echo "::error::tag ${GITHUB_REF_NAME} does not match core ${core} / python ${python}"
+              exit 1
+            fi
+          done
+      - run: uv build python
+      - run: uvx twine check --strict python/dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-dist
+          path: python/dist/
+
+  npm:
+    name: release / npm
+    needs: build
+    if: github.repository_owner == 'MolCrafts' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release-core
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      # npm 11.5+ (Node 24) is the minimum for OIDC trusted publishing.
+      - uses: ./.github/actions/setup-node
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build:core
+      - name: Publish unless this version is already on the registry
+        # Idempotent, so a re-run after a transient PyPI failure does not fail here.
+        run: |
+          version=$(node -p "require('./core/package.json').version")
+          if [ "$(npm view "@molcrafts/molplot@${version}" version 2>/dev/null || true)" = "$version" ]; then
+            echo "@molcrafts/molplot@${version} already published; skipping."
+          else
+            npm publish -w core --provenance --access public
+          fi
+
+  pypi:
+    name: release / pypi
+    needs: build
+    if: github.repository_owner == 'MolCrafts' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/molcrafts-molplot
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github:
+    name: release / github
+    needs: [npm, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub release unless it exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub release $GITHUB_REF_NAME already exists; leaving it alone."
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi

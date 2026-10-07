@@ -1,0 +1,32 @@
+name: lint
+
+# Presets in sync with presets/*.json, biome, and tsc over core + example.
+# Same job in every context; see "CI" in CLAUDE.md.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [dev, master, main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(fromJSON('["dev","master","main"]'), github.base_ref || github.ref_name) }}
+
+jobs:
+  web:
+    name: lint / web
+    # A pull request from a branch of this same repository was already run by its push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+      - run: npm run check:presets
+      - run: npx biome check
+      - run: npm run typecheck

@@ -1,0 +1,18 @@
+name: setup-node
+description: Node on PATH (the version .nvmrc names unless one is given), with the npm cache.
+inputs:
+  node-version:
+    description: Node version; empty reads .nvmrc
+    default: ""
+  registry-url:
+    description: npm registry to authenticate against (publishing only)
+    default: ""
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version == '' && '.nvmrc' || '' }}
+        registry-url: ${{ inputs.registry-url }}
+        cache: npm

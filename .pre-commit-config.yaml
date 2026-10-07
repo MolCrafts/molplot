@@ -1,7 +1,7 @@
 # Managed by prek: `prek install`
 default_install_hook_types: [pre-commit, pre-push]
 
-# Local hooks mirror .github/workflows/ci.yml job-for-job so a green pre-push
+# Local hooks mirror .github/workflows/lint.yml and test.yml so a green pre-push
 # means a green CI. See CLAUDE.md "Build & test".
 repos:
   - repo: local

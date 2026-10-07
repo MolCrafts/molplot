@@ -17,7 +17,7 @@ mol_project:
   science:
     required: false
   ci:
-    config: .github/workflows/ci.yml
+    config: .github/workflows/test.yml
     local: "npm run check:presets && npx biome check && npm run typecheck && npm test"
   notes_path: .claude/notes/notes.md
   specs_path: .claude/specs/
@@ -132,9 +132,31 @@ an rsbuild alias; each package's `dist/` is for publish only.
 
 ## Release
 
-Tag `v*` fires two workflows: `release-core.yml` (npm OIDC Trusted Publisher,
-Node 24, `npm publish -w core --provenance`) and `release-python.yml` (build the
-wheel after `npm run build:presets`, publish to PyPI via OIDC). Both re-run the
-preset drift check first. Fork/upstream convention mirrors the other MolCrafts
-repos: origin = `Roy-Kid/molplot`, upstream = `MolCrafts/molplot`; integrate on
-`dev`, release from `master`.
+Tag `v*` runs `release.yml`: lint + test on the tag, the tag checked against
+`core/package.json` and `python/pyproject.toml`, then (MolCrafts only)
+`release / npm` (OIDC trusted publishing, Node 24, `npm publish -w core
+--provenance`, environment `release-core`), `release / pypi` (OIDC, environment
+`pypi`) and `release / github` (the GitHub release). `workflow_dispatch` is a
+dry run that builds without uploading. The npm and PyPI trusted publishers name
+the workflow file `release.yml`. Fork/upstream convention mirrors the other
+MolCrafts repos: origin = `Roy-Kid/molplot`, upstream = `MolCrafts/molplot`;
+integrate on `dev`, release from `master`.
+
+## CI
+
+One workflow per kind of work. A *feature* ref is any branch other than
+`dev`/`master`/`main`; an *integration* ref is one of those, or a pull request
+into one. A pull request from a branch of this repository does not re-run
+what its push already ran: lint, docs, core and package never, the full Python
+tier only when the head is a feature branch (its push ran the fast tier).
+
+| workflow | feature branch (fork or MolCrafts) | integration ref (fork or MolCrafts) | MolCrafts only |
+|---|---|---|---|
+| `lint.yml` | `lint / web` (presets drift, biome, tsc) | same | — |
+| `test.yml` | `test / core`, `test / py3.10 (ubuntu-latest)`, `test / package` | `test / core`, `test / py{3.10,3.12} ({ubuntu,macos,windows}-latest)`, `test / package` | — |
+| `docs.yml` | `docs / build` (`zensical build --strict`) | same | deploy: Cloudflare Pages, outside Actions |
+| `release.yml` | — | — | `v*` tag: lint + test + `release / build` + `release / {npm,pypi,github}`; `workflow_dispatch` = dry run (no upload) |
+
+The `protect-master` ruleset on `master` requires a pull request, blocks force
+pushes and deletion, and requires the integration-tier `lint /`, `test /` and
+`docs /` checks.

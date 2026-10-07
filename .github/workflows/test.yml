@@ -1,0 +1,70 @@
+name: test
+
+# Core (rstest) and the Python package (pytest), plus both release artifacts
+# built. A feature branch (fork or MolCrafts) runs Python on Linux 3.10; dev,
+# master, main and pull requests into them run Linux, macOS and Windows on
+# Python 3.10 and 3.12.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [dev, master, main]
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ !contains(fromJSON('["dev","master","main"]'), github.base_ref || github.ref_name) }}
+
+jobs:
+  core:
+    name: test / core
+    # A pull request from a branch of this same repository was already run by its push.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-node
+      - run: npm ci
+      - run: npm run test:core
+
+  python:
+    name: test / py${{ matrix.python }} (${{ matrix.os }})
+    # A pull request from a branch of this same repository runs only when its
+    # push ran the fast tier, i.e. when the head is a feature branch.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || !contains(fromJSON('["dev","master","main"]'), github.head_ref)
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(contains(fromJSON('["dev","master","main"]'), github.base_ref || github.ref_name) && '["ubuntu-latest","macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
+        python: ${{ fromJSON(contains(fromJSON('["dev","master","main"]'), github.base_ref || github.ref_name) && '["3.10","3.12"]' || '["3.10"]') }}
+    env:
+      UV_PYTHON: ${{ matrix.python }}
+    defaults:
+      run:
+        working-directory: python
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-python
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv sync --extra dev
+      - run: uv run pytest -q
+
+  package:
+    name: test / package
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-node
+      - uses: ./.github/actions/setup-python
+      - run: npm ci
+      - run: npm run build:core
+      - run: npm pack -w core --dry-run
+      - run: uv build python
+      - run: uvx twine check --strict python/dist/*

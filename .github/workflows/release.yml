@@ -60,12 +60,12 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      # npm 11.5+ (Node 24) is the minimum for OIDC trusted publishing.
       - uses: ./.github/actions/setup-node
         with:
-          node-version: "24"
           registry-url: https://registry.npmjs.org
-      - run: npm ci
+      # npm 11.5+ is the minimum for OIDC trusted publishing; .nvmrc's Node
+      # bundles an older npm.
+      - run: npm install -g npm@11
       - run: npm run build:core
       - name: Publish unless this version is already on the registry
         # Idempotent, so a re-run after a transient PyPI failure does not fail here.

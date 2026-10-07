@@ -26,7 +26,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node
-      - run: npm ci
       - run: npm run check:presets
       - run: npx biome check
       - run: npm run typecheck

@@ -28,7 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node
-      - run: npm ci
       - run: npm run test:core
 
   python:
@@ -63,7 +62,6 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-node
       - uses: ./.github/actions/setup-python
-      - run: npm ci
       - run: npm run build:core
       - run: npm pack -w core --dry-run
       - run: uv build python

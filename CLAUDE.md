@@ -134,7 +134,7 @@ an rsbuild alias; each package's `dist/` is for publish only.
 
 Tag `v*` runs `release.yml`: lint + test on the tag, the tag checked against
 `core/package.json` and `python/pyproject.toml`, then (MolCrafts only)
-`release / npm` (OIDC trusted publishing, Node 24, `npm publish -w core
+`release / npm` (OIDC trusted publishing, npm 11, `npm publish -w core
 --provenance`, environment `release-core`), `release / pypi` (OIDC, environment
 `pypi`) and `release / github` (the GitHub release). `workflow_dispatch` is a
 dry run that builds without uploading. The npm and PyPI trusted publishers name

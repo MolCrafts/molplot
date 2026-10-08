@@ -13,9 +13,8 @@ on:
 permissions:
   contents: read
 
-# One group per file, workflow, event and ref. Under workflow_call (release.yml
-# running lint/test) github.workflow and github.event_name are the caller's, so
-# a called run never shares, and so never cancels, a direct run's group.
+# One group per file, workflow, event and ref; a release is never cancelled.
+# The canonical block: actions/check-workflows.
 concurrency:
   group: release-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
@@ -30,7 +29,7 @@ jobs:
       upstream: ${{ steps.context.outputs.upstream }}
       integration: ${{ steps.context.outputs.integration }}
       skip-pr: ${{ steps.context.outputs.skip-pr }}
-      cancel: ${{ steps.context.outputs.cancel }}
+      publish: ${{ steps.context.outputs.publish }}
     steps:
       - id: context
         uses: MolCrafts/molcrafts-ci/actions/ci-context@master
@@ -76,9 +75,9 @@ jobs:
   npm:
     name: release / npm
     needs: [context, build]
-    if: github.event_name == 'push' && needs.context.outputs.upstream == 'true'
+    if: needs.context.outputs.publish == 'true'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && 'npm' || '' }}
+    environment: npm
     permissions:
       contents: read
       id-token: write
@@ -108,9 +107,9 @@ jobs:
   pypi:
     name: release / pypi
     needs: [context, build]
-    if: github.event_name == 'push' && needs.context.outputs.upstream == 'true'
+    if: needs.context.outputs.publish == 'true'
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'push' && 'pypi' || '' }}
+    environment: pypi
     permissions:
       id-token: write
     steps:
@@ -123,7 +122,7 @@ jobs:
   github:
     name: release / github
     needs: [context, npm, pypi]
-    if: github.event_name == 'push' && needs.context.outputs.upstream == 'true'
+    if: needs.context.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -144,8 +144,9 @@ integrate on `dev`, release from `master`.
 
 ## CI
 
-One workflow per kind of work, two test tiers (`test / context` decides, through MolCrafts/molcrafts-ci/actions/ci-context). The
-*fast* tier runs on a feature-branch push to MolCrafts; the *full* tier on every
+One workflow per kind of work, two test tiers (`test / context` decides,
+through `MolCrafts/molcrafts-ci/actions/ci-context`). The *fast* tier runs on a
+feature-branch push to MolCrafts; the *full* tier on every
 push to a fork (so a branch is proven before its pull request), on
 `dev`/`master`/`main` pushes to MolCrafts, on pull requests, tags and
 dispatches. A pull request inside a fork is skipped (its push already ran the

@@ -2,8 +2,9 @@ name: release
 
 # A v* tag on MolCrafts/molplot: guard (the tag is both package versions) ->
 # lint + the full test tier -> build -> @molcrafts/molplot to npm and
-# molcrafts-molplot to PyPI (both trusted publishing) -> the GitHub release.
-# A dispatch is the dry run, fork or upstream: everything but the uploads.
+# molcrafts-molplot to PyPI (both trusted publishing: release.yml and the
+# `npm` / `pypi` environments) -> the GitHub release. A dispatch is the dry
+# run, fork or upstream: everything but the uploads, and no environment.
 on:
   push:
     tags: ["v*"]
@@ -59,7 +60,7 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.repository_owner == 'MolCrafts'
     runs-on: ubuntu-latest
-    environment: release-core
+    environment: ${{ github.event_name == 'push' && 'npm' || '' }}
     permissions:
       contents: read
       id-token: write
@@ -74,6 +75,10 @@ jobs:
       - run: npm run build:core
       - name: Publish unless this version is already on the registry
         # Idempotent, so a re-run after a transient PyPI failure does not fail here.
+        # setup-node's registry-url exports a placeholder NODE_AUTH_TOKEN that
+        # would override OIDC; empty, npm publishes through the id-token.
+        env:
+          NODE_AUTH_TOKEN: ""
         run: |
           version=$(node -p "require('./core/package.json').version")
           if [ "$(npm view "@molcrafts/molplot@${version}" version 2>/dev/null || true)" = "$version" ]; then
@@ -87,9 +92,7 @@ jobs:
     needs: build
     if: github.event_name == 'push' && github.repository_owner == 'MolCrafts'
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/molcrafts-molplot
+    environment: ${{ github.event_name == 'push' && 'pypi' || '' }}
     permissions:
       id-token: write
     steps:

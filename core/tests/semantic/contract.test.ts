@@ -219,6 +219,13 @@ describe("editor contract (fake engine)", () => {
     expect(checkSetCommand(scene, set("format", "  "), 1)?.code).toBe(
       "invalid_value",
     );
+    expect(checkSetCommand(scene, set("format", "banana"), 1)?.code).toBe(
+      "invalid_value",
+    );
+    expect(checkSetCommand(scene, set("scale", "log"), 1)).toBeNull();
+    expect(checkSetCommand(scene, set("scale", "logit"), 1)?.code).toBe(
+      "invalid_value",
+    );
     expect(checkSetCommand(scene, set("min", 1e-3), 1)).toBeNull();
   });
 });

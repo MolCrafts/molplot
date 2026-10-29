@@ -259,5 +259,12 @@ def test_check_set_command_axis_values():
     )
     assert check_set_command(scene, set_axis("format", "scientific"), 1) is None
     assert check_set_command(scene, set_axis("format", "  "), 1).code == "invalid_value"
+    assert check_set_command(scene, set_axis("format", "banana"), 1).code == (
+        "invalid_value"
+    )
+    assert check_set_command(scene, set_axis("scale", "log"), 1) is None
+    assert check_set_command(scene, set_axis("scale", "logit"), 1).code == (
+        "invalid_value"
+    )
     assert check_set_command(scene, set_axis("min", 1e-3), 1) is None
     assert check_set_command(scene, set_axis("min", "lo"), 1).code == "invalid_value"

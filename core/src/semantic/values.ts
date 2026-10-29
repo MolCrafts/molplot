@@ -1,5 +1,8 @@
 import { isFiniteNumber } from "./hex";
 
+export const AXIS_FORMATS = ["auto", "scientific", "plain", "percent"] as const;
+export const AXIS_SCALES = ["linear", "log", "symlog"] as const;
+
 export function parseOpacity(value: unknown): number | null {
   if (!isFiniteNumber(value) || value < 0 || value > 1) return null;
   return value;

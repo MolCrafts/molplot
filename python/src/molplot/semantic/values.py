@@ -6,6 +6,9 @@ from typing import Any
 
 from .hex import is_finite_number
 
+AXIS_FORMATS = frozenset({"auto", "scientific", "plain", "percent"})
+AXIS_SCALES = frozenset({"linear", "log", "symlog"})
+
 
 def parse_opacity(value: Any) -> float | None:
     if not is_finite_number(value):

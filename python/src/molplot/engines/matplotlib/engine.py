@@ -44,6 +44,8 @@ from molplot.semantic import (
 from molplot.semantic.bbox import parse_bbox
 from molplot.semantic.hex import is_finite_number, normalize_hex
 from molplot.semantic.values import (
+    AXIS_FORMATS,
+    AXIS_SCALES,
     parse_bool,
     parse_dash,
     parse_name,
@@ -64,8 +66,39 @@ except ImportError:  # pragma: no cover
         pass
 
 
-_AXIS_SCALES = {"linear", "log", "symlog"}
-_AXIS_FORMATS = {"auto", "scientific", "plain", "percent"}
+def _previous_value(node: Node, component: str, prop: str) -> Any:
+    """Value to feed back into ``_apply_set`` if a later step fails."""
+    comp = getattr(node.components, component, None)
+    if comp is None:
+        return None
+    value = getattr(comp, prop, None)
+    if isinstance(value, BBox):
+        return {"x": value.x, "y": value.y, "w": value.w, "h": value.h}
+    if isinstance(value, list):
+        return list(value)
+    return value
+
+
+def _collapse_opacity(node: Node) -> None:
+    """One alpha writer per node. Stroke and fill already call ``set_alpha``."""
+    editability = node.editability
+    fill = (editability.get("fill") or {}).get("opacity")
+    stroke = (editability.get("stroke") or {}).get("opacity")
+    appearance = editability.get("appearance")
+    if fill == "editable":
+        stroke_map = editability.get("stroke")
+        if stroke_map and stroke_map.get("opacity") == "editable":
+            stroke_map["opacity"] = "readonly"
+        if appearance and appearance.get("opacity") == "editable":
+            appearance["opacity"] = "readonly"
+    elif (
+        stroke == "editable"
+        and appearance
+        and appearance.get("opacity") == "editable"
+    ):
+        appearance["opacity"] = "readonly"
+    for child in node.children:
+        _collapse_opacity(child)
 
 
 def _axis_name(axis: Any, ax: Any) -> str:
@@ -350,21 +383,25 @@ class MatplotlibEngine:
         for fig in self._figs:
             self._ensure_drawn(fig)
         if len(self._figs) == 1:
-            return Scene(
+            scene = Scene(
                 engine_id="matplotlib",
                 root=self._reflect_figure(self._figs[0], "figure/0"),
             )
-        children = [
-            self._reflect_figure(fig, f"figure/{i}") for i, fig in enumerate(self._figs)
-        ]
-        root = Node(
-            id="session",
-            role="figure",
-            label="Session",
-            children=children,
-            components=Components(geometry=Geometry(bbox=BBox(0.0, 0.0, 1.0, 1.0))),
-        )
-        return Scene(engine_id="matplotlib", root=root)
+        else:
+            children = [
+                self._reflect_figure(fig, f"figure/{i}")
+                for i, fig in enumerate(self._figs)
+            ]
+            root = Node(
+                id="session",
+                role="figure",
+                label="Session",
+                children=children,
+                components=Components(geometry=Geometry(bbox=BBox(0.0, 0.0, 1.0, 1.0))),
+            )
+            scene = Scene(engine_id="matplotlib", root=root)
+        _collapse_opacity(scene.root)
+        return scene
 
     def _reflect_figure(self, fig: Any, prefix: str) -> Node:
         node_id = self._bind(prefix, fig)
@@ -1204,15 +1241,28 @@ class MatplotlibEngine:
         handle = self._handles.get(command.node_id)
         if handle is None:
             return fail(request_id, "unknown_node", command.node_id)
+        node = find_node(scene.root, command.node_id)
+        previous = (
+            _previous_value(node, command.component, command.property)
+            if node is not None
+            else None
+        )
         try:
             self._apply_set(handle, command.component, command.property, command.value)
             if isinstance(handle, Line2D):
                 self._sync_legend(handle)
         except Exception as exc:
+            if previous is not None:
+                try:
+                    self._apply_set(
+                        handle, command.component, command.property, previous
+                    )
+                except Exception:
+                    pass
             return fail(request_id, "apply_failed", str(exc))
+        # Empty title/annotation text drops the node. That is a successful edit:
+        # publish the new scene so the client does not keep a stale revision.
         self._ensure_drawn(self._fig_of(handle))
-        if find_node(self.reflect().root, command.node_id) is None:
-            return fail(request_id, "apply_failed", "node vanished after apply")
         self._rev += 1
         return ok(request_id, render_result(self, request_id))
 
@@ -1408,13 +1458,13 @@ class MatplotlibEngine:
             return
         if prop == "format":
             kind = parse_name(value)
-            if kind is None or kind not in _AXIS_FORMATS:
+            if kind is None or kind not in AXIS_FORMATS:
                 raise ValueError("format")
             _set_axis_formatter(handle, kind)
             return
         if prop == "scale":
             kind = parse_name(value)
-            if kind is None or kind not in _AXIS_SCALES:
+            if kind is None or kind not in AXIS_SCALES:
                 raise ValueError("scale")
             if name == "x":
                 ax.set_xscale(kind)

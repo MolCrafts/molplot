@@ -15,6 +15,8 @@ import {
 } from "./generated";
 import { isFiniteNumber, normalizeHex } from "./hex";
 import {
+  AXIS_FORMATS,
+  AXIS_SCALES,
   parseBool,
   parseDash,
   parseName,
@@ -250,6 +252,28 @@ export function checkSetCommand(
       return {
         code: "invalid_value",
         message: `${command.property} must be a non-empty string`,
+      };
+    }
+    if (
+      command.property === "format" &&
+      !AXIS_FORMATS.includes(
+        parseName(command.value) as (typeof AXIS_FORMATS)[number],
+      )
+    ) {
+      return {
+        code: "invalid_value",
+        message: "format must be auto, scientific, plain, or percent",
+      };
+    }
+    if (
+      command.property === "scale" &&
+      !AXIS_SCALES.includes(
+        parseName(command.value) as (typeof AXIS_SCALES)[number],
+      )
+    ) {
+      return {
+        code: "invalid_value",
+        message: "scale must be linear, log, or symlog",
       };
     }
   }

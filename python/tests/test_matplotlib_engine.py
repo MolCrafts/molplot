@@ -452,6 +452,67 @@ def test_title_typography_and_axis_label_content():
     assert ax.get_xlabel() == "Reaction time (min)"
 
 
+def test_clearing_text_drops_the_node_and_publishes_the_scene():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    ax.set_title("Energy")
+    ax.text(0.2, 0.8, "peak")
+    engine = MatplotlibEngine(fig)
+    title = find_by_role(engine.reflect().root, "title")[0]
+    note = find_by_role(engine.reflect().root, "annotation")[0]
+    cleared = _apply(engine, note, "text", "content", "  ")
+    assert cleared.ok, cleared.error
+    assert cleared.result.revision == 2
+    assert find_node(cleared.result.scene.root, note.id) is None
+    assert ax.texts[0].get_text() == "  "
+    title_gone = _apply(
+        engine,
+        find_node(engine.reflect().root, title.id),
+        "text",
+        "content",
+        "",
+    )
+    assert title_gone.ok, title_gone.error
+    assert title_gone.result.revision == 3
+    assert find_by_role(title_gone.result.scene.root, "title") == []
+    assert ax.title.get_text() == ""
+
+
+def test_line_alpha_has_one_writer():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    engine = MatplotlibEngine(fig)
+    series = find_by_role(engine.reflect().root, "series")[0]
+    assert series.editability["stroke"]["opacity"] == "editable"
+    assert series.editability["appearance"]["opacity"] == "readonly"
+    rejected = _apply(engine, series, "appearance", "opacity", 0.2)
+    assert not rejected.ok
+    assert rejected.error.code == "not_editable"
+    assert line_alpha(ax.lines[0]) == 1
+
+
+def line_alpha(line):
+    alpha = line.get_alpha()
+    return 1 if alpha is None else alpha
+
+
+def test_unknown_axis_format_does_not_mutate():
+    fig, ax = plt.subplots()
+    ax.plot([0, 1], [0, 1])
+    engine = MatplotlibEngine(fig)
+    xaxis = next(
+        node
+        for node in find_by_role(engine.reflect().root, "axis")
+        if node.id.endswith("/axis/x")
+    )
+    before = type(ax.xaxis.get_major_formatter()).__name__
+    result = _apply(engine, xaxis, "axis", "format", "banana")
+    assert not result.ok
+    assert result.error.code == "invalid_value"
+    assert engine.revision() == 1
+    assert type(ax.xaxis.get_major_formatter()).__name__ == before
+
+
 def test_annotation_text_is_editable():
     fig, ax = plt.subplots()
     ax.plot([0, 1], [0, 1])

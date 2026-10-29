@@ -1,7 +1,11 @@
-import { Database, Diamond, Palette } from "lucide-react";
+import {
+  ColorRegular,
+  DatabaseRegular,
+  DiamondRegular,
+} from "@fluentui/react-icons";
+import { Tabs, TabsContent } from "@molcrafts/ui";
 import type { JSX } from "react";
 import { PanelTabStrip } from "@/components/blocks/panel-tab-strip";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { DataPanel, type DatumRef } from "@/components/workbench/DataPanel";
 import { ElementsPanel } from "@/components/workbench/ElementsPanel";
 import { PresetPanel } from "@/components/workbench/PresetPanel";
@@ -42,9 +46,9 @@ export function LeftRail({
         <PanelTabStrip
           label="Data, elements, or preset"
           items={[
-            { value: "data", label: "Data", icon: <Database /> },
-            { value: "elements", label: "Elements", icon: <Diamond /> },
-            { value: "preset", label: "Preset", icon: <Palette /> },
+            { value: "data", label: "Data", icon: <DatabaseRegular /> },
+            { value: "elements", label: "Elements", icon: <DiamondRegular /> },
+            { value: "preset", label: "Preset", icon: <ColorRegular /> },
           ]}
         />
       </div>

@@ -1,10 +1,5 @@
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@molcrafts/ui";
 import type * as React from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type BaseButtonProps = Omit<
@@ -13,7 +8,7 @@ type BaseButtonProps = Omit<
 >;
 
 export interface IconButtonProps extends BaseButtonProps {
-  /** Lucide (or equivalent) glyph. Never text. */
+  /** Fluent glyph. Never text. */
   icon: React.ReactNode;
   /** Accessible name and tooltip. Required — icon-only controls have no visible label. */
   label: string;

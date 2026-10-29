@@ -1,6 +1,6 @@
+import { Input } from "@molcrafts/ui";
 import type React from "react";
 import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export interface NumberFieldProps
@@ -25,9 +25,9 @@ export interface NumberFieldProps
 }
 
 /**
- * Numeric input that holds a string draft while editing and commits a
- * clamped, step-rounded value on blur or Enter. Shared by the View-tab
- * render controls and the Data Source per-component parameters.
+ * Inspector number draft. Compact because the property rows are a stated
+ * space constraint. `format` keeps a text draft so scientific notation can
+ * round-trip through the design Input.
  */
 export function NumberField({
   value,
@@ -44,13 +44,13 @@ export function NumberField({
   useEffect(() => setDraft(shown), [shown]);
 
   const commit = () => {
-    let v = Number(draft);
-    if (Number.isNaN(v)) v = value;
-    if (min !== undefined) v = Math.max(min, v);
-    if (max !== undefined) v = Math.min(max, v);
-    if (step !== undefined) v = Math.round(v / step) * step;
-    onChange(v);
-    setDraft(format ? format(v) : String(v));
+    let next = Number(draft);
+    if (Number.isNaN(next)) next = value;
+    if (min !== undefined) next = Math.max(min, next);
+    if (max !== undefined) next = Math.min(max, next);
+    if (step !== undefined) next = Math.round(next / step) * step;
+    onChange(next);
+    setDraft(format ? format(next) : String(next));
   };
 
   return (
@@ -66,9 +66,11 @@ export function NumberField({
       min={min}
       max={max}
       step={step}
-      onChange={(e) => setDraft(e.target.value)}
+      onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
-      onKeyDown={(e) => e.key === "Enter" && commit()}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") commit();
+      }}
     />
   );
 }

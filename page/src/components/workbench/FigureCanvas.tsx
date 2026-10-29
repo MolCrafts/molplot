@@ -1,4 +1,5 @@
 import type { BBox, Command } from "@molcrafts/molplot/semantic";
+import { EmptyState } from "@molcrafts/ui";
 import type {
   JSX,
   DragEvent as ReactDragEvent,
@@ -6,7 +7,6 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
 import type { DatumRef } from "@/components/workbench/DataPanel";
 import { FigureRulers } from "@/components/workbench/FigureRulers";
 import { QuickMenu } from "@/components/workbench/QuickMenu";

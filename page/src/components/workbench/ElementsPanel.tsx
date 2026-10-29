@@ -1,6 +1,5 @@
+import { EmptyState, ScrollArea } from "@molcrafts/ui";
 import type { JSX } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { HostResult } from "@/lib/host";
 import { nodeTitle, walk } from "@/lib/scene";
 import { cn } from "@/lib/utils";

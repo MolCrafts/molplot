@@ -1,14 +1,14 @@
 import type { Command, ComponentName, Node } from "@molcrafts/molplot/semantic";
-import { type JSX, useLayoutEffect, useRef, useState } from "react";
-import { NumberField } from "@/components/ui/number-field";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
+  Separator,
+} from "@molcrafts/ui";
+import { type JSX, useLayoutEffect, useRef, useState } from "react";
+import { NumberField } from "@/components/workbench/NumberField";
 import { formatSize } from "@/lib/format";
 import { placeQuickMenu } from "@/lib/overlay";
 import { editState } from "@/lib/scene";

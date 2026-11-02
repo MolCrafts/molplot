@@ -249,7 +249,8 @@ export abstract class VegaChart {
     // A spec that never went through a builder (RawChart) has no zoom params,
     // so its wheels can skip the hit test entirely.
     this.zoomable = zoomParamsOf(spec).length > 0;
-    // Hit-test against the Vega container. Canvas and SVG both live inside
+    // Hit-test against the Vega container, not an inner canvas/SVG.
+    // Container mode is the interaction surface: both renderers live inside
     // it, and `view.origin()` is relative to this element.
     this.rendered = this.container;
     this.result = result;

@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  presets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Presets in sync (single source of truth)
+        run: npm run check:presets
+      - name: Editor schema in sync
+        run: npm run check:schema
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Biome lint & format check
+        run: npm run check:biome
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Typecheck (core / page)
+        run: npm run typecheck
+
+  test-core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Test core (rstest, node)
+        run: npm run test:core
+
+  build-core:
+    runs-on: ubuntu-latest
+    needs: [presets, lint, typecheck, test-core]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Build core
+        run: npm run build:core
+
+  test-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - name: Sync generated presets and editor schema
+        run: npm run build:presets && npm run build:schema
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install package + dev deps
+        run: pip install -e ".[dev]"
+        working-directory: python
+      - name: Test python (pytest)
+        run: python -m pytest -q
+        working-directory: python
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install zensical + theme
+        run: |
+          python -m pip install -U pip
+          pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.3.0"
+      - name: Build docs from source-compiled elements.js
+        run: npm run docs:build
+      - name: Docs must not load the molplot CDN
+        run: |
+          test -f docs/assets/molplot/elements.js
+          test -f site/assets/molplot/elements.js
+          grep -q 'src="./assets/molplot/elements.js"' site/index.html
+          if grep -R -E '<script[^>]+src="https://cdn.jsdelivr.net/npm/@molcrafts/molplot' site --include='*.html'; then
+            echo "docs site still loads the molplot CDN as a script" >&2
+            exit 1
+          fi
+
+  build-python:
+    runs-on: ubuntu-latest
+    needs: [presets, test-python]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install && npm run build:presets
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Build wheel
+        run: pip install build && python -m build --wheel
+        working-directory: python

@@ -14,15 +14,13 @@ build/
 .pytest_cache/
 .ruff_cache/
 .benchmarks/
+.tox/
 
-# Docs
+# Docs (zensical output + staged <molplot-chart> bundle from core/dist)
 site/
-# Staged from core/dist for local zensical; rebuild stages fresh.
-docs/assets/molplot/
+docs/assets/
 
 # OS / editors
 .DS_Store
 *.log
-
-.tox/
-.venv/
+.cache/

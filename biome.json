@@ -12,7 +12,8 @@
       "!**/docs/assets",
       "!**/.cache",
       "!**/*.css",
-      "!**/presets/generated.ts"
+      "!**/presets/generated.ts",
+      "!**/semantic/generated.ts"
     ]
   },
   "formatter": {

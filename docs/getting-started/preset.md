@@ -1,34 +1,28 @@
-# The Unified Preset
+# Preset
 
-A preset is a set of design tokens — palette, type scale, geometry, and light/
-dark colours — defined once in `presets/<name>.json` and validated against
-`presets/preset.schema.json`. It is the **single source of truth** for both
-renderers.
+A browser chart and a matplotlib figure each pick fonts and colours on their
+own, so “the same plot” is two restyles. The preset is the shared token file
+both sides compile from: palette, type scale, grid, light and dark.
 
-`scripts/build-presets.mjs` compiles each preset into:
+Two names ship. `molplot` is the default. `molplot-paper` is tighter, for a
+single journal column — same colours, smaller type and markers, higher DPI.
 
-| Output | Consumed by |
-|--------|-------------|
-| `core/src/presets/generated.ts` | the TypeScript renderer (typed const) |
-| `python/src/molplot/presets/_generated.py` | the Python renderer (dict) |
-| `python/src/molplot/presets/<name>[-dark].mplstyle` | `plt.style.use("<name>")` |
+```python
+molplot.use("molplot")
+molplot.use("molplot-paper")
+```
 
-From those tokens each side builds its native theme:
+On the web, pass the same name as `preset`. Dark mode is `mode="dark"` in
+Python and `theme="dark"` (or `"auto"`) on the web.
 
-- **Web** — `vegaConfig(theme)` → a Vega-Lite `config` merged into every spec.
-- **Python** — `rc_params(name, mode)` → matplotlib `rcParams`, layered on the
-  scienceplots base named by the preset's `sciencePlotsBase`.
+| | `molplot` | `molplot-paper` |
+|--|-----------|-----------------|
+| For | screen | single-column print |
+| scienceplots base | `science` | `science` + `nature` |
+| Type (base / title / tick) | 10 / 12 / 9 | 9 / 10 / 8 |
+| Marker | 6 | 3 |
+| Figure / DPI | 3.5 × 2.625 in / 400 | 3.3 × 2.5 in / 600 |
 
-Because both derive from the same numbers, a chart looks the same in a browser
-and in a paper.
-
-## Editing a preset
-
-1. Edit `presets/<name>.json` (or add a new file).
-2. Run `npm run build:presets`.
-3. Commit both the JSON and the regenerated files — CI runs
-   `npm run check:presets` and fails on drift.
-
-Two presets ship by default: **`molplot`** (sans-serif, screen-oriented) and
-**`molplot-paper`** (serif, high-DPI, layered on scienceplots' `nature` base).
-Both use the same categorical palette so colour identity survives the switch.
+Both use Times and the scienceplots seven-colour cycle (`#0c5da5` …). To
+change those, edit `presets/<name>.json` and run `npm run build:presets`.
+Commit the generated files — CI fails if they drift.

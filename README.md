@@ -24,17 +24,20 @@ manuscript.
 
 ```
 molplot/
-├── presets/            # canonical design tokens (single source of truth) + JSON schema
-├── scripts/            # build-presets.mjs — compiles presets → per-package artifacts
-├── core/               # @molcrafts/molplot — Vega-Lite chart classes (TypeScript)
-├── example/            # Web Component example (React 19 + rsbuild)
-├── python/             # molcrafts-molplot — scienceplots wrapper + VL→matplotlib
-└── docs/               # zensical docs
+├── presets/            # design tokens (single source of truth) + JSON schema
+├── schema/             # editor contract (Scene / Command / Engine)
+├── scripts/            # build-presets.mjs, build-schema.mjs
+├── core/               # @molcrafts/molplot — Vega-Lite charts + VegaEngine (TS)
+├── page/               # figure workbench (React; `molplot serve` / npm run dev)
+├── examples/           # themed examples: web/ playground, figures/ scripts
+├── python/             # molcrafts-molplot — matplotlib + MatplotlibEngine + host
+├── tests/fixtures/     # shared editor fixtures (TS + Python)
+└── docs/               # zensical sources (build output is gitignored `site/`)
 ```
 
 ## Quick start
 
-**Web (TypeScript)**
+**Web (TypeScript)** — `npm install @molcrafts/molplot`
 
 ```ts
 import { LineChart } from "@molcrafts/molplot";
@@ -61,10 +64,16 @@ fig, ax = molplot.render(spec)               # same spec → matplotlib figure
 
 ```bash
 npm install
+pip install -e './python[dev]'
 npm run build:presets    # regenerate preset artifacts from presets/*.json
-npm run dev:example      # Web Component example at localhost:3000
-npm run typecheck        # core + example
-npm test                 # core (rstest) + python (pytest)
+npm run build:schema     # regenerate editor types from schema/editor/model.json
+npm run build:docs-assets # compile <molplot-chart> from core/ → docs/assets/molplot
+npm run docs             # documentation site (source-built Web Component, not CDN)
+npm run dev              # figure workbench at localhost:3001 (proxy /api → :8765)
+npm run example:web      # Web Component playground at localhost:3000
+npm run example:kinetics # figure workbench (`examples/figures/kinetics.py`)
+npm run typecheck        # core + page + examples/web
+npm test                 # core + page (rstest) + python (pytest)
 npm run lint             # biome
 ```
 
@@ -75,20 +84,22 @@ The generated preset files (`core/src/presets/generated.ts`,
 ## Documentation
 
 Full manual: [docs.molcrafts.org/molplot](https://docs.molcrafts.org/molplot/)
-(sources in [`docs/`](docs/)):
+(sources in [`docs/`](docs/)). Live `<molplot-chart>` charts and `molplot`
+fenced blocks on that site are compiled from `core/`
+(`npm run build:docs-assets`), not loaded from a CDN.
 
 - [Getting started](https://docs.molcrafts.org/molplot/getting-started/)
 - [Unified preset](https://docs.molcrafts.org/molplot/getting-started/preset/)
-- [Web (Vega-Lite)](https://docs.molcrafts.org/molplot/getting-started/web/)
-- [Python (scienceplots)](https://docs.molcrafts.org/molplot/getting-started/python/)
-- [Charts in Markdown](https://docs.molcrafts.org/molplot/getting-started/markdown/)
+- [Web](https://docs.molcrafts.org/molplot/getting-started/web/)
+- [Python](https://docs.molcrafts.org/molplot/getting-started/python/)
+- [Markdown](https://docs.molcrafts.org/molplot/getting-started/markdown/)
+- [Workbench](https://docs.molcrafts.org/molplot/getting-started/workbench/)
 - [API reference](https://docs.molcrafts.org/molplot/api/)
 
 ```bash
-# local preview
-pip install -e ./python  # or: pip install molcrafts-molplot
-pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.2.5"
-zensical serve
+# local preview — compiles core/dist/elements.js then serves docs
+pip install "zensical>=0.0.53" "molcrafts-zensical-theme>=0.3.0"
+npm run docs
 ```
 
 ## License

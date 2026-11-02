@@ -101,13 +101,16 @@ function installElementStyles(): void {
   box-sizing: border-box;
   width: min(100%, var(--molplot-width, 28rem));
   aspect-ratio: var(--molplot-aspect, 16 / 10);
-  /* Inner air so axis titles clear the host edge without eating the plot. */
-  padding: 0.5rem;
+  /* Inner air so axis titles clear the host edge without eating the plot.
+   * Hosts may set padding:0 for compact sparklines; the surface inset tracks
+   * the same custom property so the plot fills the box. */
+  --molplot-pad: 0.5rem;
+  padding: var(--molplot-pad);
   overflow: hidden;
 }
 :where([data-molplot-chart]) > :where(.molplot-chart__surface) {
   position: absolute;
-  inset: 0.5rem;
+  inset: var(--molplot-pad);
   min-width: 0;
   min-height: 0;
   overflow: hidden;

@@ -14,11 +14,11 @@ preset.
 ## Install
 
 ```sh
-npm install @molcrafts/molplot vega vega-lite vega-embed
+npm install @molcrafts/molplot
 ```
 
-The Vega runtime is loaded lazily and externalized from the build, so a consumer
-that never renders a chart never pays for the bundle.
+Vega is a dependency of this package. It is loaded lazily; a consumer that
+never draws a chart does not bundle it.
 
 ## Usage
 

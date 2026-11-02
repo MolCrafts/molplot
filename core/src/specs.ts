@@ -124,7 +124,7 @@ function scaleDef(cfg: AxisConfig | undefined): Record<string, unknown> {
 
 function size(spec: SpecSize | undefined): {
   width: number | "container";
-  height: number;
+  height: number | "container";
 } {
   return { width: spec?.width ?? "container", height: spec?.height ?? 300 };
 }

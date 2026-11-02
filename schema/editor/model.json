@@ -1,0 +1,81 @@
+{
+  "role": [
+    "figure",
+    "panel",
+    "axis",
+    "series",
+    "legend",
+    "title",
+    "annotation",
+    "colorbar"
+  ],
+  "editState": ["editable", "readonly", "unsupported"],
+  "traversalStatus": ["represented", "consumed", "internal", "unsupported"],
+  "engineId": ["matplotlib", "vega"],
+  "applyErrorCode": [
+    "stale_revision",
+    "unknown_node",
+    "unknown_component",
+    "unknown_property",
+    "not_editable",
+    "invalid_value",
+    "apply_failed",
+    "not_implemented"
+  ],
+  "commandType": ["set"],
+  "viewKind": ["svg"],
+  "components": {
+    "transform": {},
+    "geometry": {
+      "bbox": "BBox"
+    },
+    "appearance": {
+      "visible": "boolean",
+      "opacity": "number",
+      "zIndex": "number"
+    },
+    "stroke": {
+      "color": "string",
+      "width": "number",
+      "opacity": "number",
+      "dash": "number[]"
+    },
+    "fill": {
+      "color": "string",
+      "opacity": "number"
+    },
+    "text": {
+      "content": "string"
+    },
+    "typography": {
+      "family": "string",
+      "size": "number",
+      "weight": "string",
+      "style": "string",
+      "color": "string"
+    },
+    "marker": {
+      "shape": "string",
+      "size": "number",
+      "color": "string"
+    },
+    "layout": {
+      "width": "number",
+      "height": "number",
+      "xMin": "number",
+      "xMax": "number",
+      "yMin": "number",
+      "yMax": "number"
+    },
+    "axis": {
+      "min": "number",
+      "max": "number",
+      "ticks": "number[]",
+      "tickLabels": "string[]",
+      "format": "string",
+      "scale": "string"
+    },
+    "binding": {},
+    "source": {}
+  }
+}

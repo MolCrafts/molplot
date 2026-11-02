@@ -1,0 +1,13 @@
+/* Gallery is one full-width chart after another. Do not share the 2-col
+   homepage grid — those cards shrink the plot to a stamp. */
+.molplot-gallery figure.molcrafts-figure {
+  max-width: none;
+}
+
+.molplot-gallery figure.molcrafts-figure molplot-chart,
+.molplot-gallery .molcrafts-figure__body--chart molplot-chart {
+  width: 100%;
+  max-width: none;
+  min-height: 28rem;
+  aspect-ratio: 16 / 10;
+}

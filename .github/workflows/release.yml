@@ -1,0 +1,139 @@
+name: release
+
+# A v* tag on MolCrafts/molplot: guard (the tag is both package versions) ->
+# lint + the full test tier -> build -> @molcrafts/molplot to npm and
+# molcrafts-molplot to PyPI (both trusted publishing: release.yml and the
+# `npm` / `pypi` environments) -> the GitHub release. A dispatch is the dry
+# run, fork or upstream: everything but the uploads, and no environment.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One group per file, workflow, event and ref; a release is never cancelled.
+# The canonical block: actions/check-workflows.
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # Where this run happens, decided once: MolCrafts/molcrafts-ci/actions/ci-context.
+  context:
+    name: release / context
+    runs-on: ubuntu-latest
+    outputs:
+      tier: ${{ steps.context.outputs.tier }}
+      upstream: ${{ steps.context.outputs.upstream }}
+      integration: ${{ steps.context.outputs.integration }}
+      skip-pr: ${{ steps.context.outputs.skip-pr }}
+      publish: ${{ steps.context.outputs.publish }}
+    steps:
+      - id: context
+        uses: MolCrafts/molcrafts-ci/actions/ci-context@master
+
+  guard:
+    name: release / guard
+    needs: context
+    if: github.event_name == 'workflow_dispatch' || needs.context.outputs.upstream == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag is both package versions
+        if: github.event_name == 'push'
+        run: |
+          core=$(node -p "require('./core/package.json').version")
+          python=$(python3 -c 'import tomllib; print(tomllib.load(open("python/pyproject.toml", "rb"))["project"]["version"])')
+          for version in "$core" "$python"; do
+            [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "::error::tag $GITHUB_REF_NAME is not core $core / python $python"; exit 1; }
+          done
+
+  lint:
+    needs: guard
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    needs: guard
+    uses: ./.github/workflows/test.yml
+
+  build:
+    name: release / build
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: MolCrafts/molcrafts-ci/actions/setup-python@master
+      - run: uv build python
+      - run: uvx twine check --strict python/dist/*
+      - uses: actions/upload-artifact@v7
+        with:
+          name: python-dist
+          path: python/dist/
+
+  npm:
+    name: release / npm
+    needs: [context, build]
+    if: needs.context.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@master
+        with:
+          registry-url: https://registry.npmjs.org
+      # npm 11.5+ is the minimum for OIDC trusted publishing; .nvmrc's Node
+      # bundles an older npm.
+      - run: npm install -g npm@11
+      - run: npm run build:core
+      - name: Publish unless this version is already on the registry
+        # Idempotent, so a re-run after a transient PyPI failure does not fail here.
+        # setup-node's registry-url exports a placeholder NODE_AUTH_TOKEN that
+        # would override OIDC; empty, npm publishes through the id-token.
+        env:
+          NODE_AUTH_TOKEN: ""
+        run: |
+          version=$(node -p "require('./core/package.json').version")
+          if [ "$(npm view "@molcrafts/molplot@${version}" version 2>/dev/null || true)" = "$version" ]; then
+            echo "@molcrafts/molplot@${version} already published; skipping."
+          else
+            npm publish -w core --provenance --access public
+          fi
+
+  pypi:
+    name: release / pypi
+    needs: [context, build]
+    if: needs.context.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: python-dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github:
+    name: release / github
+    needs: [context, npm, pypi]
+    if: needs.context.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub release unless it exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "GitHub release $GITHUB_REF_NAME already exists; leaving it alone."
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          fi

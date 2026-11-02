@@ -17,7 +17,7 @@ mol_project:
   science:
     required: false
   ci:
-    config: .github/workflows/ci.yml
+    config: .github/workflows/test.yml
     local: "npm run check:presets && npx biome check && npm run typecheck && npm test"
   notes_path: .claude/notes/notes.md
   specs_path: .claude/specs/
@@ -132,9 +132,35 @@ an rsbuild alias; each package's `dist/` is for publish only.
 
 ## Release
 
-Tag `v*` fires two workflows: `release-core.yml` (npm OIDC Trusted Publisher,
-Node 24, `npm publish -w core --provenance`) and `release-python.yml` (build the
-wheel after `npm run build:presets`, publish to PyPI via OIDC). Both re-run the
-preset drift check first. Fork/upstream convention mirrors the other MolCrafts
-repos: origin = `Roy-Kid/molplot`, upstream = `MolCrafts/molplot`; integrate on
-`dev`, release from `master`.
+Tag `v*` runs `release.yml`: lint + test on the tag, the tag checked against
+`core/package.json` and `python/pyproject.toml`, then (MolCrafts only)
+`release / npm` (OIDC trusted publishing, npm 11, `npm publish -w core
+--provenance`, environment `npm`), `release / pypi` (OIDC, environment
+`pypi`) and `release / github` (the GitHub release). `workflow_dispatch` is a
+dry run that builds without uploading. The npm and PyPI trusted publishers name
+the workflow file `release.yml`. Fork/upstream convention mirrors the other
+MolCrafts repos: origin = `Roy-Kid/molplot`, upstream = `MolCrafts/molplot`;
+integrate on `dev`, release from `master`.
+
+## CI
+
+One workflow per kind of work, two test tiers (`test / context` decides,
+through `MolCrafts/molcrafts-ci/actions/ci-context`). The *fast* tier runs on a
+feature-branch push to MolCrafts; the *full* tier on every
+push to a fork (so a branch is proven before its pull request), on
+`dev`/`master`/`main` pushes to MolCrafts, on pull requests, tags and
+dispatches. A pull request inside a fork is skipped (its push already ran the
+full tier); a pull request on MolCrafts runs. Shared setup comes from
+`MolCrafts/molcrafts-ci/actions/<name>@master`.
+
+| workflow | fast tier | full tier | MolCrafts only |
+|---|---|---|---|
+| `lint.yml` | `lint / web` (presets drift, biome, tsc), `lint / workflows` (`actions/check-workflows`) | same | — |
+| `test.yml` | `test / context`, `test / core`, `test / python (ubuntu-latest, 3.10)`, `test / package` | `test / context`, `test / core`, `test / python ({ubuntu,macos,windows}-latest, {3.10,3.12})`, `test / package` | — |
+| `docs.yml` | `docs / build` (`zensical build --strict`) | same | deploy: Cloudflare Pages, outside Actions |
+| `release.yml` | — | — | `v*` tag: `release / guard` + lint + test + `release / build` + `release / {npm,pypi,github}`; `workflow_dispatch` = dry run (no upload) |
+
+The `protect-master` ruleset on `master` requires a pull request and blocks
+force pushes and deletion. Its required checks (`test / context` plus the
+full-tier `lint /`, `test /` and `docs /` jobs) are added once they have gone
+green on a pull request into `master`.

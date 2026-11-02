@@ -38,9 +38,11 @@ dev = [
 # Docs: Markdown fences live in the MolCrafts theme, not this package.
 # Paper charting remains this package (`import molplot`).
 [dependency-groups]
+# The theme needs Python >= 3.12 while the package supports >= 3.10; the
+# markers keep the group resolvable for every supported Python.
 doc = [
-    "zensical>=0.0.53",
-    "molcrafts-zensical-theme>=0.2.5",
+    "zensical>=0.0.53; python_version >= '3.12'",
+    "molcrafts-zensical-theme>=0.2.5; python_version >= '3.12'",
     "molcrafts-molplot",
 ]
 

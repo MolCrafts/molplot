@@ -47,9 +47,9 @@ dev = [
 # The theme needs Python >= 3.12 while the package supports >= 3.10; the
 # markers keep the group resolvable for every supported Python.
 doc = [
-    "zensical>=0.0.53",
-    "molcrafts-zensical-theme>=0.3.0",
-    "molcrafts-molplot",
+    "zensical>=0.0.53; python_version >= '3.12'",
+    "molcrafts-zensical-theme>=0.3.0; python_version >= '3.12'",
+    "molcrafts-molplot; python_version >= '3.12'",
 ]
 
 [project.urls]

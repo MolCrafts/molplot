@@ -7,7 +7,8 @@
     "dev": "rsbuild dev",
     "build": "rsbuild build",
     "typecheck": "tsc --noEmit",
-    "test": "rstest run"
+    "test": "rstest run",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fluentui/react-icons": "2.0.344",
@@ -23,6 +24,7 @@
     "@molcrafts/ui-tokens": "$@molcrafts/ui-tokens"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
     "@rsbuild/core": "^2.0.8",
     "@rsbuild/plugin-react": "^2.0.0",
     "@rstest/core": "^0.10.3",

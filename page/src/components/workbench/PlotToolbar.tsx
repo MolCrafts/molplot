@@ -1,8 +1,6 @@
 import {
   ArrowAutofitContentRegular,
   ArrowDownloadRegular,
-  ArrowRedoRegular,
-  ArrowUndoRegular,
   GridRegular,
 } from "@fluentui/react-icons";
 import {
@@ -11,7 +9,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  Separator,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -33,9 +30,6 @@ export function PlotToolbar({
 }): JSX.Element {
   return (
     <>
-      <IconButton icon={<ArrowUndoRegular />} label="Undo" disabled />
-      <IconButton icon={<ArrowRedoRegular />} label="Redo" disabled />
-      <Separator orientation="vertical" className="mx-1 h-5" />
       <IconButton
         icon={<ArrowAutofitContentRegular />}
         label="Fit canvas"

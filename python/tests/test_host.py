@@ -131,12 +131,13 @@ def test_cli_requires_subcommand():
         assert exc.code != 0
 
 
-def test_cli_serve_requires_script():
-    try:
-        main(["serve"])
-        raise AssertionError("expected SystemExit")
-    except SystemExit as exc:
-        assert exc.code != 0
+def test_cli_serve_accepts_empty_workspace(monkeypatch):
+    import molplot.cli as cli
+
+    received = []
+    monkeypatch.setattr(cli, "_serve", lambda args: received.append(args.scripts))
+    main(["serve", "--no-open"])
+    assert received == [[]]
 
 
 def test_result_reports_figure_count():

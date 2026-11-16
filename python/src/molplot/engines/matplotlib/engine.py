@@ -303,10 +303,10 @@ def _uniform_width_px(artists: list[Any], dpi: float) -> float | None:
 class MatplotlibEngine:
     engine_id = "matplotlib"
 
-    def __init__(self, fig: Any) -> None:
+    def __init__(self, fig: Any, *, revision: int = 1) -> None:
         self._figs = _as_figs(fig)
         self._fig = self._figs[0]
-        self._rev = 1
+        self._rev = revision
         self._handles: dict[str, Any] = {}
         self._diagnostics = Diagnostics()
 

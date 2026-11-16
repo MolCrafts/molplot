@@ -25,7 +25,29 @@ ax.set_ylabel("y")
 ax.legend(loc="lower right")
 ```
 
-The left **Preset** tab restyles the live figure. MolPlot presets are always
+One running workbench holds any number of figures. Keep the first command running;
+from another terminal, add more scripts using the same host and port:
+
+```sh
+molplot serve another.py
+molplot serve comparison.py summary.py
+```
+
+These commands append to the existing server and return immediately. New figures
+appear automatically in **Figures**, without changing the active selection. A
+script that creates several figures adds each one separately. You can also start
+an empty workbench with `molplot serve`, then add scripts later. Use the same
+`--port` on subsequent commands if you started on a custom port.
+
+Switch between **Figures** thumbnails and the collapsible **Elements** tree on
+the left. Selecting text or a curve shows its common formatting controls above
+the canvas. The right inspector shows only the selected element's properties;
+all groups start collapsed. **Advanced settings** contains **Data** and
+**Presets and global style**. Exports always use the selected figure. Figures and
+edits remain in memory while the server runs, including across browser reloads;
+restart the server to start a fresh workbench.
+
+The **Presets and global style** group restyles the selected live figure. MolPlot presets are always
 available. scienceplots and seaborn are optional — install them in the same
 Python environment as the host, or the source stays disabled with an install
 hint. scienceplots' `science` style turns on matplotlib TeX; TeX Live basic is
@@ -36,3 +58,8 @@ grid, legend, colormap, save). The script is re-run after a style change, so
 explicit kwargs in the file still win over rc defaults.
 
 In this repo: `npm run example:kinetics`.
+
+For repository browser checks, install Chromium once with
+`npm exec -w page playwright install chromium`, then run `npm run test:e2e`.
+The checks use `python/.venv/bin/python` when available; set `MOLPLOT_PYTHON` to
+use another Python environment with MolPlot installed.

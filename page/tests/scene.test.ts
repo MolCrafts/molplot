@@ -64,8 +64,18 @@ describe("scene helpers", () => {
     expect(canMove(legend)).toBe(true);
   });
 
-  it("titles from label then id", () => {
+  it("titles from text, label, then id", () => {
     expect(nodeTitle(series)).toBe("Catalyst A");
+    expect(
+      nodeTitle(
+        node({
+          id: "title",
+          role: "title",
+          label: "Title",
+          components: { text: { content: "Reaction kinetics" } },
+        }),
+      ),
+    ).toBe("Reaction kinetics");
     expect(nodeTitle(node({ id: "x", role: "panel" }))).toBe("x");
   });
 

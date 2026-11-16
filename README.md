@@ -60,6 +60,11 @@ fig, ax = molplot.render(spec)               # same spec → matplotlib figure
 # ...or hand `spec` (JSON) to the web renderer for an identical chart.
 ```
 
+**Figure workbench** — run `molplot serve plot.py`, then run
+`molplot serve another.py` in another terminal to add more figures to the same
+server. Use `molplot serve` to start empty. The Figures sidebar updates live;
+each figure keeps its edits and exports independently until the server stops.
+
 ## Develop
 
 ```bash

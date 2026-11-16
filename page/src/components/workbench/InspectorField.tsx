@@ -57,9 +57,11 @@ export function InspectorSection({
   children: ReactNode;
 }): JSX.Element {
   return (
-    <section className="space-y-2">
-      <h3 className="text-label font-semibold text-foreground">{title}</h3>
-      <div className="space-y-1.5">{children}</div>
-    </section>
+    <details className="group border-b border-border pb-3">
+      <summary className="cursor-pointer py-1 text-label font-semibold text-foreground">
+        {title}
+      </summary>
+      <div className="space-y-1.5 pt-2">{children}</div>
+    </details>
   );
 }

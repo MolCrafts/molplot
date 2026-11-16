@@ -70,6 +70,7 @@ export function PanelTabStrip({
               >
                 {item.icon}
               </span>
+              <span className="ml-1.5 text-label">{item.label}</span>
             </TabsTrigger>
           </TooltipTrigger>
           <TooltipContent side={tooltipSide}>{item.label}</TooltipContent>

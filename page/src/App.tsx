@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { WorkbenchShell } from "@/components/blocks/workbench-shell";
 import type { DatumRef } from "@/components/workbench/DataPanel";
 import { FigureCanvas } from "@/components/workbench/FigureCanvas";
+import { FormatToolbar } from "@/components/workbench/FormatToolbar";
 import { Inspector } from "@/components/workbench/Inspector";
 import { LeftRail, type LeftTab } from "@/components/workbench/LeftRail";
 import { PlotToolbar } from "@/components/workbench/PlotToolbar";
@@ -14,7 +15,7 @@ import { defaultSelection, findNode, scriptStem } from "@/lib/scene";
 export function App(): JSX.Element {
   const session = useHostSession();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [leftTab, setLeftTab] = useState<LeftTab>("data");
+  const [leftTab, setLeftTab] = useState<LeftTab>("figures");
   const [leftOpen, setLeftOpen] = useState(
     () =>
       typeof window === "undefined" ||
@@ -31,6 +32,12 @@ export function App(): JSX.Element {
   const scene = session.result?.scene;
 
   useEffect(() => {
+    void session.figureId;
+    setSelectedId(null);
+    setHighlighted(null);
+  }, [session.figureId]);
+
+  useEffect(() => {
     if (!scene) return;
     setSelectedId((current) => {
       if (current && findNode(scene.root, current)) return current;
@@ -44,6 +51,7 @@ export function App(): JSX.Element {
       fmt,
       session.result.revision,
       scriptStem(session.result.script),
+      session.figureId ?? undefined,
     );
   };
 
@@ -51,7 +59,10 @@ export function App(): JSX.Element {
     <div className="h-full w-full">
       <WorkbenchShell
         product="MolPlot"
-        version="v0.1.6"
+        version={
+          session.figures.find((figure) => figure.id === session.figureId)
+            ?.title ?? "Figure workbench"
+        }
         logo={
           <span
             aria-hidden
@@ -59,6 +70,15 @@ export function App(): JSX.Element {
           >
             ∿
           </span>
+        }
+        ribbon={
+          <FormatToolbar
+            key={session.figureId}
+            node={
+              scene && selectedId ? findNode(scene.root, selectedId) : undefined
+            }
+            onApply={session.apply}
+          />
         }
         toolbar={
           <PlotToolbar
@@ -74,23 +94,24 @@ export function App(): JSX.Element {
             onTabChange={setLeftTab}
             result={session.result}
             selectedId={selectedId}
-            highlighted={highlighted}
-            applying={session.status === "applying"}
-            error={session.error}
+            figures={session.figures}
+            figureId={session.figureId}
+            onSelectFigure={session.selectFigure}
             onSelect={setSelectedId}
-            onHighlight={setHighlighted}
-            onApplyStyle={session.applyStyle}
           />
         }
         right={
           <Inspector
+            key={`${session.figureId}-${selectedId}`}
             result={session.result}
             selectedId={selectedId}
             onApply={session.apply}
-            onShowData={() => {
-              setLeftTab("data");
-              setLeftOpen(true);
-            }}
+            highlighted={highlighted}
+            onHighlight={setHighlighted}
+            onSelect={setSelectedId}
+            onApplyStyle={session.applyStyle}
+            applying={session.status === "applying"}
+            error={session.error}
           />
         }
         leftOpen={leftOpen}
@@ -99,6 +120,7 @@ export function App(): JSX.Element {
         onRightOpenChange={setRightOpen}
         canvas={
           <FigureCanvas
+            key={session.figureId}
             result={session.result}
             selectedId={selectedId}
             highlighted={highlighted}

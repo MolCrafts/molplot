@@ -9,6 +9,14 @@ describe("host urls", () => {
     expect(exportUrl("pdf", 4, true)).toBe("/api/export/pdf?r=4&download=true");
     expect(exportUrl("svg", 1)).toBe("/api/export/svg?r=1");
   });
+  it("scopes figure loads and exports to stable figure IDs", () => {
+    expect(resultUrl("ui-2", "figure/a")).toBe(
+      "/api/result?requestId=ui-2&figure=figure%2Fa",
+    );
+    expect(exportUrl("pdf", 4, true, "figure/a")).toBe(
+      "/api/export/pdf?r=4&figure=figure%2Fa&download=true",
+    );
+  });
 });
 
 describe("svg helpers", () => {

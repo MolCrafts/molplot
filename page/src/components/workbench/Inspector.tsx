@@ -10,19 +10,21 @@ import {
   SelectValue,
 } from "@molcrafts/ui";
 import { type JSX, useEffect, useState } from "react";
+import { DataPanel, type DatumRef } from "@/components/workbench/DataPanel";
 import {
   InspectorField,
   InspectorSection,
   ValueChip,
 } from "@/components/workbench/InspectorField";
 import { NumberField } from "@/components/workbench/NumberField";
+import { PresetPanel } from "@/components/workbench/PresetPanel";
 import {
   formatScience,
   formatSize,
   parseNumberList,
   parseStringList,
 } from "@/lib/format";
-import type { HostResult } from "@/lib/host";
+import type { HostResult, StyleCommand } from "@/lib/host";
 import { editState, nodePath, nodeTitle, scriptStem } from "@/lib/scene";
 import { dashForStyle, ptToPx, pxToPt, styleForDash } from "@/lib/units";
 import { cn } from "@/lib/utils";
@@ -34,12 +36,22 @@ export function Inspector({
   result,
   selectedId,
   onApply,
-  onShowData,
+  highlighted,
+  onHighlight,
+  onSelect,
+  onApplyStyle,
+  applying,
+  error,
 }: {
   result: HostResult | null;
   selectedId: string | null;
   onApply: (command: Omit<Command, "baseRevision">) => Promise<boolean>;
-  onShowData: () => void;
+  highlighted: DatumRef | null;
+  onHighlight: (datum: DatumRef | null) => void;
+  onSelect: (id: string) => void;
+  onApplyStyle: (command: StyleCommand) => Promise<boolean>;
+  applying: boolean;
+  error: string | null;
 }): JSX.Element {
   const node =
     result && selectedId
@@ -73,6 +85,11 @@ export function Inspector({
             {path.map((item) => item.role).join(" / ")}
           </p>
         </header>
+        {error && (
+          <p role="alert" className="text-label text-destructive">
+            {error}
+          </p>
+        )}
         {node.role === "figure" ? (
           <FigureSection node={node} onSet={setValue} />
         ) : null}
@@ -109,17 +126,35 @@ export function Inspector({
         node.role !== "series" ? (
           <GeometrySection node={node} onSet={setValue} />
         ) : null}
-        <InspectorSection title="Data source">
-          <p className="text-micro text-accent">
+        <InspectorSection title="Advanced settings">
+          <p className="text-micro text-muted-foreground">
             {scriptStem(result.script)}.py
           </p>
-          <button
-            type="button"
-            onClick={onShowData}
-            className="text-micro text-muted-foreground hover:text-foreground"
-          >
-            View in data panel
-          </button>
+          <details>
+            <summary className="cursor-pointer py-2 text-label">Data</summary>
+            <div className="h-72">
+              <DataPanel
+                result={result}
+                selectedId={selectedId}
+                highlighted={highlighted}
+                onSelect={onSelect}
+                onHighlight={onHighlight}
+              />
+            </div>
+          </details>
+          <details>
+            <summary className="cursor-pointer py-2 text-label">
+              Presets and global style
+            </summary>
+            <div className="h-96">
+              <PresetPanel
+                result={result}
+                applying={applying}
+                error={error}
+                onApplyStyle={onApplyStyle}
+              />
+            </div>
+          </details>
         </InspectorSection>
       </div>
     </ScrollArea>

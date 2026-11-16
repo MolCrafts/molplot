@@ -66,7 +66,7 @@ export function editState(
 }
 
 export function nodeTitle(node: Node): string {
-  return node.label || node.components.text?.content || node.id;
+  return node.components.text?.content || node.label || node.id;
 }
 
 export function defaultSelection(root: Node): string {

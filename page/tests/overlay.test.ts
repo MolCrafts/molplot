@@ -25,31 +25,6 @@ describe("clampBox", () => {
   });
 });
 
-describe("placeQuickMenu", () => {
-  const menu = { w: 180, h: 32 };
-
-  it("sits above a click in the middle of the paper", () => {
-    const pos = placeQuickMenu(
-      { x: 200, y: 120 },
-      { w: 400, h: 300 },
-      menu,
-      10,
-    );
-    expect(pos.x).toBeCloseTo(200 - 90);
-    expect(pos.y).toBeCloseTo(120 - 32 - 10);
-  });
-
-  it("flips below when there is no room above", () => {
-    const pos = placeQuickMenu({ x: 200, y: 8 }, { w: 400, h: 300 }, menu, 10);
-    expect(pos.y).toBeCloseTo(18);
-  });
-
-  it("clamps to the paper edge", () => {
-    const pos = placeQuickMenu({ x: 10, y: 150 }, { w: 400, h: 300 }, menu, 10);
-    expect(pos.x).toBe(10);
-  });
-});
-
 describe("pathToD", () => {
   it("builds a figure-fraction polyline", () => {
     expect(
@@ -96,5 +71,40 @@ describe("hitTest", () => {
     expect(
       hitTest({ x: 0.02, y: 0.02 }, [line], [panel, figure], 400, 300, 14),
     ).toBe("figure-0");
+  });
+});
+
+describe("placeQuickMenu", () => {
+  const menu = { w: 180, h: 32 };
+  const bounds = { w: 400, h: 300 };
+  it("opens beside a click and flips left at the right edge", () => {
+    expect(placeQuickMenu({ x: 200, y: 120 }, bounds, menu)).toEqual({
+      x: 210,
+      y: 130,
+    });
+    expect(placeQuickMenu({ x: 390, y: 120 }, bounds, menu)).toEqual({
+      x: 200,
+      y: 130,
+    });
+  });
+  it("stays beside the pointer even when every nearby position contains chart ink", () => {
+    const position = placeQuickMenu(
+      { x: 200, y: 120 },
+      { w: 1000, h: 800 },
+      menu,
+      10,
+      [{ x: 0, y: 0, w: 1000, h: 800 }],
+    );
+    expect(position).toEqual({ x: 210, y: 130 });
+  });
+  it("keeps the popup visible after the selected point is panned offscreen", () => {
+    expect(placeQuickMenu({ x: 900, y: 900 }, bounds, menu)).toEqual({
+      x: 210,
+      y: 258,
+    });
+    expect(placeQuickMenu({ x: -900, y: -900 }, bounds, menu)).toEqual({
+      x: 10,
+      y: 10,
+    });
   });
 });

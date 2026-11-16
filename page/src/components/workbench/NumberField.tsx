@@ -45,11 +45,11 @@ export function NumberField({
 
   const commit = () => {
     let next = Number(draft);
-    if (Number.isNaN(next)) next = value;
+    if (!draft.trim() || !Number.isFinite(next)) next = value;
     if (min !== undefined) next = Math.max(min, next);
     if (max !== undefined) next = Math.min(max, next);
     if (step !== undefined) next = Math.round(next / step) * step;
-    onChange(next);
+    if (next !== value) onChange(next);
     setDraft(format ? format(next) : String(next));
   };
 
@@ -69,7 +69,7 @@ export function NumberField({
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={(event) => {
-        if (event.key === "Enter") commit();
+        if (event.key === "Enter") event.currentTarget.blur();
       }}
     />
   );

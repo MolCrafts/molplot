@@ -86,7 +86,27 @@ export interface StyleCommand {
   rc?: CustomRc;
 }
 
+export interface FigureItem {
+  id: string;
+  title: string;
+  script: string;
+  revision: number;
+}
+
+export interface FigureCatalog {
+  instanceId: string;
+  revision: number;
+  figures: FigureItem[];
+}
+
+export async function fetchFigures(): Promise<FigureCatalog> {
+  const response = await fetch("/api/figures");
+  if (!response.ok) throw new Error(`figures ${response.status}`);
+  return response.json();
+}
+
 export interface HostResult extends RenderResult {
+  figureId?: string;
   script?: string;
   figureCount?: number;
   paths?: Record<string, PathPoint[]>;
@@ -99,8 +119,9 @@ export interface HostApplyResult extends Omit<ApplyResult, "result"> {
   result?: HostResult;
 }
 
-export function resultUrl(requestId = "result"): string {
+export function resultUrl(requestId = "result", figureId?: string): string {
   const query = new URLSearchParams({ requestId });
+  if (figureId) query.set("figure", figureId);
   return `/api/result?${query}`;
 }
 
@@ -112,14 +133,19 @@ export function exportUrl(
   fmt: ExportFormat,
   revision: number,
   download = false,
+  figureId?: string,
 ): string {
   const query = new URLSearchParams({ r: String(revision) });
+  if (figureId) query.set("figure", figureId);
   if (download) query.set("download", "true");
   return `/api/export/${fmt}?${query}`;
 }
 
-export async function fetchResult(requestId = "result"): Promise<HostResult> {
-  const response = await fetch(resultUrl(requestId));
+export async function fetchResult(
+  requestId = "result",
+  figureId?: string,
+): Promise<HostResult> {
+  const response = await fetch(resultUrl(requestId, figureId));
   if (!response.ok) {
     throw new Error(`result ${response.status}`);
   }
@@ -129,11 +155,16 @@ export async function fetchResult(requestId = "result"): Promise<HostResult> {
 async function postHostCommand(
   command: Command | StyleCommand,
   requestId: string,
+  figureId?: string,
 ): Promise<HostApplyResult> {
   const response = await fetch(commandsUrl(), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ requestId, command }),
+    body: JSON.stringify({
+      requestId,
+      command,
+      ...(figureId ? { figureId } : {}),
+    }),
   });
   if (!response.ok) {
     throw new Error(`commands ${response.status}`);
@@ -144,24 +175,27 @@ async function postHostCommand(
 export async function postCommand(
   command: Command,
   requestId: string,
+  figureId?: string,
 ): Promise<HostApplyResult> {
-  return postHostCommand(command, requestId);
+  return postHostCommand(command, requestId, figureId);
 }
 
 export async function postStyle(
   command: StyleCommand,
   requestId: string,
+  figureId?: string,
 ): Promise<HostApplyResult> {
-  return postHostCommand(command, requestId);
+  return postHostCommand(command, requestId, figureId);
 }
 
 export function downloadExport(
   fmt: ExportFormat,
   revision: number,
   stem: string,
+  figureId?: string,
 ): void {
   const link = document.createElement("a");
-  link.href = exportUrl(fmt, revision, true);
+  link.href = exportUrl(fmt, revision, true, figureId);
   link.download = `${stem}.${fmt}`;
   link.rel = "noopener";
   document.body.append(link);

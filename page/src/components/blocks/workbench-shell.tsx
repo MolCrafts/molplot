@@ -45,6 +45,7 @@ export interface WorkbenchShellProps {
   version?: string;
   /** Icon-only actions, trailing cluster. Use IconButton. Modes do not live here. */
   toolbar: ReactNode;
+  ribbon?: ReactNode;
   canvas: ReactNode;
   left?: ReactNode;
   right?: ReactNode;
@@ -114,6 +115,7 @@ export function WorkbenchShell({
   logo,
   version,
   toolbar,
+  ribbon,
   canvas,
   left,
   right,
@@ -350,6 +352,7 @@ export function WorkbenchShell({
         </div>
         <div className="flex items-center gap-1">{toolbar}</div>
       </header>
+      {ribbon}
 
       <div className="relative min-h-0 flex-1">
         <ResizablePanelGroup

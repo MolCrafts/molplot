@@ -155,7 +155,7 @@ def test_style_command_applies_molplot_and_reloads(tmp_path):
     assert applied["ok"], applied
     style = applied["result"]["style"]
     assert style["current"] == {"source": "molplot", "name": "molplot"}
-    assert plt.rcParams["axes.prop_cycle"].by_key()["color"][0].lower() in {
+    assert _session.rc["axes.prop_cycle"].by_key()["color"][0].lower() in {
         "#0c5da5",
         "0c5da5",
     }

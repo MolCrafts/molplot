@@ -1,246 +1,145 @@
-"""FastAPI workbench around one MatplotlibEngine session."""
+"""FastAPI host for a reusable, multi-figure workbench."""
 
 from __future__ import annotations
 
-import threading
+import secrets
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.types import Lifespan
 
-from molplot.engines.matplotlib import MatplotlibEngine
-from molplot.host.style import (
-    LATEX_HINT,
-    SCRIPT_SOURCE,
-    StyleError,
-    apply_source,
-    disable_usetex,
-    is_latex_error,
-)
-from molplot.host.style import (
-    payload as style_payload,
-)
-from molplot.semantic.codec import (
-    apply_result_to_json,
-    command_from_json,
-    render_result_to_json,
-)
-from molplot.semantic.engine import fail, ok, render_result
+from molplot.host.session import Session  # compatibility for existing embedded hosts
+from molplot.host.workspace import FigureNotFound, Workspace
+from molplot.semantic.codec import apply_result_to_json, command_from_json
+from molplot.semantic.engine import fail
 
 STATIC = Path(__file__).parent / "static"
 DIST = Path(__file__).parent / "dist"
 ASSET_DIRS = ("js", "css", "assets", "image", "font", "svg")
-EXPORT_MEDIA = {
-    "svg": "image/svg+xml",
-    "pdf": "application/pdf",
-    "png": "image/png",
-}
-
-
-class Session:
-    def __init__(self, fig: Any, script: str | None) -> None:
-        self.engine = MatplotlibEngine(fig)
-        self.script = script
-        self.lock = threading.Lock()
-        self.style_source = SCRIPT_SOURCE
-        self.style_name = SCRIPT_SOURCE
-
-    @property
-    def stem(self) -> str:
-        if self.script:
-            return Path(self.script).stem
-        return "figure"
-
-    def _decorate(self, payload: dict[str, Any]) -> dict[str, Any]:
-        payload["script"] = self.script
-        payload["figureCount"] = len(getattr(self.engine, "_figs", [None]))
-        payload.update(self.engine.workbench_extras())
-        payload["style"] = style_payload(self.style_source, self.style_name)
-        return payload
-
-    def _render_json(self, request_id: str) -> dict[str, Any]:
-        try:
-            return render_result_to_json(render_result(self.engine, request_id))
-        except Exception as exc:
-            if not is_latex_error(exc):
-                raise
-            disable_usetex()
-            return render_result_to_json(render_result(self.engine, request_id))
-
-    def result_payload(self, request_id: str) -> dict[str, Any]:
-        return self._decorate(self._render_json(request_id))
-
-    def apply_style(
-        self,
-        request_id: str,
-        source: str,
-        name: str,
-        rc: dict[str, Any] | None,
-    ) -> dict[str, Any]:
-        script = self.script
-        if not script or not Path(script).is_file():
-            payload = apply_result_to_json(
-                fail(request_id, "apply_failed", "No figure script to reload.")
-            )
-            payload["script"] = self.script
-            return payload
-        import matplotlib as mpl
-        import matplotlib.pyplot as plt
-
-        from molplot.host.figures import load_script
-
-        previous_rc = mpl.rcParams.copy()
-        previous_source = self.style_source
-        previous_name = self.style_name
-        try:
-            apply_source(source, name, rc if isinstance(rc, dict) else None)
-            figs = load_script(script)
-        except StyleError as exc:
-            mpl.rcParams.update(previous_rc)
-            self.style_source = previous_source
-            self.style_name = previous_name
-            payload = apply_result_to_json(fail(request_id, exc.code, exc.message))
-            payload["script"] = self.script
-            return payload
-        except Exception as exc:
-            mpl.rcParams.update(previous_rc)
-            self.style_source = previous_source
-            self.style_name = previous_name
-            if is_latex_error(exc):
-                disable_usetex()
-                payload = apply_result_to_json(
-                    fail(request_id, "apply_failed", LATEX_HINT)
-                )
-            else:
-                payload = apply_result_to_json(
-                    fail(request_id, "apply_failed", str(exc))
-                )
-            payload["script"] = self.script
-            return payload
-        old_figs = list(getattr(self.engine, "_figs", []))
-        new_engine = MatplotlibEngine(figs)
-        try:
-            rendered = render_result(new_engine, request_id)
-        except Exception as exc:
-            mpl.rcParams.update(previous_rc)
-            self.style_source = previous_source
-            self.style_name = previous_name
-            if is_latex_error(exc):
-                disable_usetex()
-                payload = apply_result_to_json(
-                    fail(request_id, "apply_failed", LATEX_HINT)
-                )
-            else:
-                payload = apply_result_to_json(
-                    fail(request_id, "apply_failed", str(exc))
-                )
-            payload["script"] = self.script
-            for fig in figs:
-                try:
-                    plt.close(fig)
-                except Exception:
-                    pass
-            return payload
-        self.engine = new_engine
-        self.style_source = source
-        self.style_name = name if source != "custom" else "custom"
-        for fig in old_figs:
-            try:
-                plt.close(fig)
-            except Exception:
-                pass
-        payload = apply_result_to_json(ok(request_id, rendered))
-        payload["script"] = self.script
-        if payload.get("result"):
-            self._decorate(payload["result"])
-        return payload
+EXPORT_MEDIA = {"svg": "image/svg+xml", "pdf": "application/pdf", "png": "image/png"}
 
 
 class CommandRequest(BaseModel):
     requestId: str = "apply"
+    figureId: str | None = None
     command: dict[str, Any] = Field(default_factory=dict)
+
+
+class AddFiguresRequest(BaseModel):
+    scripts: list[str] = Field(min_length=1)
+    cwd: str | None = None
 
 
 def page_index() -> Path:
     dist_index = DIST / "index.html"
-    if dist_index.is_file():
-        return dist_index
-    return STATIC / "index.html"
+    return dist_index if dist_index.is_file() else STATIC / "index.html"
 
 
-def create_app(session: Session) -> FastAPI:
-    app = FastAPI(title="MolPlot", docs_url="/api/docs", redoc_url=None)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["*"],
-        allow_headers=["*"],
+def create_app(
+    session: Session | Workspace | None = None,
+    *,
+    lifespan: Lifespan[FastAPI] | None = None,
+) -> FastAPI:
+    workspace = session if isinstance(session, Workspace) else Workspace(session)
+    app = FastAPI(
+        title="MolPlot", docs_url="/api/docs", redoc_url=None, lifespan=lifespan
     )
+    app.state.workspace = workspace
+    app.add_middleware(
+        CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"]
+    )
+
+    @app.exception_handler(FigureNotFound)
+    async def missing_figure(_request, _exc):
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(status_code=404, content={"detail": "Figure not found"})
 
     @app.get("/")
     def index() -> FileResponse:
         return FileResponse(page_index())
 
+    @app.get("/api/figures")
+    def figures() -> dict[str, Any]:
+        return workspace.catalog()
+
+    @app.post("/api/figures")
+    def add_figures(
+        body: AddFiguresRequest, authorization: str = Header(default="")
+    ) -> dict[str, Any]:
+        # Loading a script executes Python. Only the local CLI holding this host's private capability can add it.
+        if not secrets.compare_digest(authorization, f"Bearer {workspace.token}"):
+            raise HTTPException(
+                status_code=403, detail="Add figures using molplot serve <script.py>."
+            )
+        try:
+            added = workspace.add_scripts(body.scripts, body.cwd)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {**workspace.catalog(), "added": added}
+
     @app.get("/api/result")
     def get_result(
-        request_id: str = Query("result", alias="requestId"),
+        request_id: str = Query("result", alias="requestId"), figure: str | None = None
     ) -> dict[str, Any]:
-        with session.lock:
-            return session.result_payload(request_id)
+        with workspace.operation(figure) as entry:
+            return {**entry.session.result_payload(request_id), "figureId": entry.id}
 
     @app.post("/api/commands")
     def post_command(body: CommandRequest) -> dict[str, Any]:
-        raw = body.command or {}
-        if raw.get("type") == "style":
-            rc = raw.get("rc")
-            with session.lock:
-                return session.apply_style(
+        with workspace.operation(body.figureId) as entry:
+            current = entry.session
+            raw = body.command or {}
+            if raw.get("type") == "style":
+                rc = raw.get("rc")
+                result = current.apply_style(
                     body.requestId,
                     str(raw.get("source") or ""),
                     str(raw.get("name") or ""),
                     rc if isinstance(rc, dict) else None,
                 )
-        try:
-            command = command_from_json(raw)
-        except (KeyError, TypeError, ValueError) as exc:
-            payload = apply_result_to_json(
-                fail(body.requestId, "invalid_value", str(exc))
-            )
-            payload["script"] = session.script
-            return payload
-        with session.lock:
-            result = session.engine.apply(command, body.requestId)
-            payload = apply_result_to_json(result)
-            payload["script"] = session.script
-            if payload.get("result"):
-                session._decorate(payload["result"])
-            return payload
+            else:
+                try:
+                    command = command_from_json(raw)
+                except (KeyError, TypeError, ValueError) as exc:
+                    return apply_result_to_json(
+                        fail(body.requestId, "invalid_value", str(exc))
+                    )
+                result = apply_result_to_json(
+                    current.engine.apply(command, body.requestId)
+                )
+                if result.get("result"):
+                    current._decorate(result["result"])
+            result["script"] = current.script
+            result["figureId"] = entry.id
+            if result.get("result"):
+                result["result"]["figureId"] = entry.id
+            return result
 
     @app.get("/api/export/{fmt}")
     def export(
         fmt: str,
         download: bool = False,
         revision: int | None = Query(default=None, alias="r"),
+        figure: str | None = None,
     ) -> Response:
         kind = fmt.lower().lstrip(".")
-        media = EXPORT_MEDIA.get(kind)
-        if media is None:
+        if kind not in EXPORT_MEDIA:
             raise HTTPException(status_code=404, detail=f"unsupported format {fmt}")
-        with session.lock:
-            data = session.engine.export(kind)
-            _ = revision
-        filename = f"{session.stem}.{kind}"
-        disposition = "attachment" if download else "inline"
+        with workspace.operation(figure) as entry:
+            data = entry.session.engine.export(kind)
+            filename = f"{entry.session.stem}.{kind}"
         return Response(
             content=data,
-            media_type=media,
+            media_type=EXPORT_MEDIA[kind],
             headers={
                 "Cache-Control": "no-store",
-                "Content-Disposition": f'{disposition}; filename="{filename}"',
+                "Content-Disposition": f'{"attachment" if download else "inline"}; filename="{filename}"',
             },
         )
 

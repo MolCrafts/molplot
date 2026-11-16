@@ -97,8 +97,9 @@ jobs:
       - run: uv build python
       - run: uvx twine check --strict python/dist/*
 
-  # The site as Cloudflare Pages builds it, --strict: any warning fails.
-  # Cloudflare Pages deploys it from MolCrafts itself, so no job here deploys.
+  # The site with the source-built <molplot-chart> (docs/assets/molplot, which
+  # zensical.toml watches), --strict: any warning fails. Cloudflare Pages
+  # deploys it from MolCrafts itself, so no job here deploys.
   docs:
     name: test / docs
     needs: context
@@ -106,7 +107,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
       - uses: MolCrafts/molcrafts-ci/actions/setup-python@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+      - run: npm run build:docs-assets
       - run: uv run --project python --only-group doc zensical build --strict
 
   workflow-policy:

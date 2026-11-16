@@ -167,7 +167,7 @@ Each package's `dist/` is for publish only.
 
 ## Release
 
-Tag `v*` runs `release.yml`: lint + test on the tag, the tag checked against
+Tag `v*` runs `release.yml`: `test.yml` on the tag, the tag checked against
 `core/package.json` and `python/pyproject.toml`, then (MolCrafts only)
 `release / npm` (OIDC trusted publishing, npm 11, `npm publish -w core
 --provenance`, environment `npm`), `release / pypi` (OIDC, environment
@@ -179,23 +179,20 @@ integrate on `dev`, release from `master`.
 
 ## CI
 
-One workflow per kind of work, two test tiers (`test / context` decides,
-through `MolCrafts/molcrafts-ci/actions/ci-context`). The *fast* tier runs on a
-feature-branch push to MolCrafts; the *full* tier on every
-push to a fork (so a branch is proven before its pull request), on
-`dev`/`master`/`main` pushes to MolCrafts, on pull requests, tags and
-dispatches. A pull request inside a fork is skipped (its push already ran the
-full tier); a pull request on MolCrafts runs. Shared setup comes from
-`MolCrafts/molcrafts-ci/actions/<name>@master`.
+`MolCrafts/molcrafts-ci`, every reference pinned to one commit SHA. The
+workflow files are `test.yml` and `release.yml`; `.github/release.toml`
+declares the publishing targets (`npm`, `pypi`, `github-release`). Two test
+tiers (`test / context`, the shared `context.yml`, decides): the *fast* tier
+runs on a feature-branch push to MolCrafts; the *full* tier on every push to a
+fork (so a branch is proven before its pull request), on `dev`/`master`
+pushes to MolCrafts, on pull requests, tags and dispatches. A pull request
+inside a fork is skipped (its push already ran the full tier).
 
-| workflow | fast tier | full tier | MolCrafts only |
-|---|---|---|---|
-| `lint.yml` | `lint / web` (presets drift, biome, tsc), `lint / workflows` (`actions/check-workflows`) | same | — |
-| `test.yml` | `test / context`, `test / core`, `test / python (ubuntu-latest, 3.10)`, `test / package` | `test / context`, `test / core`, `test / python ({ubuntu,macos,windows}-latest, {3.10,3.12})`, `test / package` | — |
-| `docs.yml` | `docs / build` (`zensical build --strict`) | same | deploy: Cloudflare Pages, outside Actions |
-| `release.yml` | — | — | `v*` tag: `release / guard` + lint + test + `release / build` + `release / {npm,pypi,github}`; `workflow_dispatch` = dry run (no upload) |
+| workflow | jobs |
+|---|---|
+| `test.yml` | `test / lint` (presets + schema drift, biome, tsc), `test / core` (core + page rstest), `test / python (os, py)` (fast: ubuntu 3.10; full: ubuntu/macos/windows × 3.10/3.12), `test / package`, `test / docs` (`zensical build --strict`; Cloudflare Pages deploys outside Actions), `test / workflows` (`actions/check-workflows`), `test / result` |
+| `release.yml` | `v*` tag: `release / guard` + `test.yml` + `release / build` + `release / {npm,pypi,github}`; `workflow_dispatch` = dry run (no upload) |
 
-The `protect-master` ruleset on `master` requires a pull request and blocks
-force pushes and deletion. Its required checks (`test / context` plus the
-full-tier `lint /`, `test /` and `docs /` jobs) are added once they have gone
-green on a pull request into `master`.
+Branch rules require only `test / result` (the `ci` ruleset on `dev` and the
+default branch); `protect-master` requires a pull request and blocks force
+pushes and deletion.

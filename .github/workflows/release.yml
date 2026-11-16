@@ -1,9 +1,10 @@
 name: release
 
 # A v* tag on MolCrafts/molplot: guard (the tag is both package versions) ->
-# lint + the full test tier -> build -> @molcrafts/molplot to npm and
-# molcrafts-molplot to PyPI (both trusted publishing: release.yml and the
-# `npm` / `pypi` environments) -> the GitHub release. A dispatch is the dry
+# test.yml (lint, tests, docs; full tier) -> build -> @molcrafts/molplot to
+# npm and molcrafts-molplot to PyPI (both trusted publishing: release.yml and
+# the `npm` / `pypi` environments) -> the GitHub release. The targets are
+# declared in .github/release.toml. A dispatch is the dry
 # run, fork or upstream: everything but the uploads, and no environment.
 on:
   push:
@@ -20,19 +21,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Where this run happens, decided once: MolCrafts/molcrafts-ci/actions/ci-context.
+  # Where this run happens, decided once by the shared context workflow; on
+  # a tag it also checks the tag is on master.
   context:
-    name: release / context
-    runs-on: ubuntu-latest
-    outputs:
-      tier: ${{ steps.context.outputs.tier }}
-      upstream: ${{ steps.context.outputs.upstream }}
-      integration: ${{ steps.context.outputs.integration }}
-      skip-pr: ${{ steps.context.outputs.skip-pr }}
-      publish: ${{ steps.context.outputs.publish }}
-    steps:
-      - id: context
-        uses: MolCrafts/molcrafts-ci/actions/ci-context@master
+    permissions:
+      contents: read
+    name: release
+    uses: MolCrafts/molcrafts-ci/.github/workflows/context.yml@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
 
   guard:
     name: release / guard
@@ -50,21 +45,17 @@ jobs:
             [ "$GITHUB_REF_NAME" = "v$version" ] || { echo "::error::tag $GITHUB_REF_NAME is not core $core / python $python"; exit 1; }
           done
 
-  lint:
-    needs: guard
-    uses: ./.github/workflows/lint.yml
-
   test:
     needs: guard
     uses: ./.github/workflows/test.yml
 
   build:
     name: release / build
-    needs: [lint, test]
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: MolCrafts/molcrafts-ci/actions/setup-python@master
+      - uses: MolCrafts/molcrafts-ci/actions/setup-python@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
       - run: uv build python
       - run: uvx twine check --strict python/dist/*
       - uses: actions/upload-artifact@v7
@@ -83,7 +74,7 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v7
-      - uses: MolCrafts/molcrafts-ci/actions/setup-node@master
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
         with:
           registry-url: https://registry.npmjs.org
       # npm 11.5+ is the minimum for OIDC trusted publishing; .nvmrc's Node

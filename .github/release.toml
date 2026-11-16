@@ -1,0 +1,8 @@
+# Where release.yml publishes (MolCrafts/molcrafts-ci release contract).
+[npm]
+packages = ["@molcrafts/molplot"]
+
+[pypi]
+packages = ["molcrafts-molplot"]
+
+[github-release]

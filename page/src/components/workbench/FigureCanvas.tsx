@@ -1,4 +1,5 @@
 import type { BBox, Command } from "@molcrafts/molplot/semantic";
+import { EmptyState } from "@molcrafts/ui";
 import type {
   JSX,
   DragEvent as ReactDragEvent,
@@ -6,7 +7,6 @@ import type {
   WheelEvent as ReactWheelEvent,
 } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
 import type { DatumRef } from "@/components/workbench/DataPanel";
 import { FigureRulers } from "@/components/workbench/FigureRulers";
 import { QuickMenu } from "@/components/workbench/QuickMenu";
@@ -69,10 +69,12 @@ export function FigureCanvas({
   const cursorXRef = useRef<HTMLSpanElement>(null);
   const cursorYRef = useRef<HTMLSpanElement>(null);
   const [paperPx, setPaperPx] = useState({ w: 0, h: 0 });
-  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(
-    null,
-  );
-  const clickSelect = useRef<string | null>(null);
+  const [menuClick, setMenuClick] = useState<{
+    id: string;
+    x: number;
+    y: number;
+    seq: number;
+  } | null>(null);
   const lastBoxes = useRef<Record<string, BBox>>({});
   const drag = useRef<DragState | null>(null);
   const space = useRef(false);
@@ -180,23 +182,6 @@ export function FigureCanvas({
     if (path) paintDatumHighlight(svg, path, highlighted.index);
   }, [highlighted, result]);
 
-  useEffect(() => {
-    if (!selectedId || !result) return;
-    if (clickSelect.current === selectedId) return;
-    const paper = paperRef.current;
-    if (!paper || paper.clientWidth <= 0) return;
-    const node = findNode(result.scene.root, selectedId);
-    const box = node ? bboxOf(node) : undefined;
-    if (!box) {
-      setMenuAnchor({ x: paper.clientWidth / 2, y: 28 });
-      return;
-    }
-    setMenuAnchor({
-      x: (box.x + box.w / 2) * paper.clientWidth,
-      y: box.y * paper.clientHeight,
-    });
-  }, [selectedId, result]);
-
   const size = useMemo(
     () => (result ? parseSvgSize(result.view.svg) : null),
     [result],
@@ -242,8 +227,6 @@ export function FigureCanvas({
     if (page.width <= 0 || page.height <= 0) return;
     const clearSelection = () => {
       onSelect(null);
-      setMenuAnchor(null);
-      clickSelect.current = null;
     };
     if (
       event.clientX < page.left ||
@@ -289,15 +272,13 @@ export function FigureCanvas({
       return;
     }
     onSelect(node.id);
-    const paperEl = paperRef.current;
-    if (paperEl && paperEl.clientWidth > 0) {
-      const rect = paperEl.getBoundingClientRect();
-      clickSelect.current = node.id;
-      setMenuAnchor({
-        x: ((event.clientX - rect.left) / rect.width) * paperEl.clientWidth,
-        y: ((event.clientY - rect.top) / rect.height) * paperEl.clientHeight,
-      });
-    }
+    setMenuClick((previous) => ({
+      id: node.id,
+      x: p.x,
+      y: p.y,
+      seq: (previous?.seq ?? 0) + 1,
+    }));
+
     const box = bboxOf(node);
     if (!box || !canMove(node)) return;
     drag.current = {
@@ -464,17 +445,33 @@ export function FigureCanvas({
                   />
                 ) : null}
               </div>
-              {selected && menuAnchor ? (
-                <QuickMenu
-                  node={selected}
-                  onApply={onApply}
-                  anchor={menuAnchor}
-                />
-              ) : null}
             </div>
           </FigureRulers>
         </div>
       </div>
+      {selected?.role === "series" && selected.components.stroke && (
+        <QuickMenu
+          key={`${selected.id}-${menuClick?.id === selected.id ? menuClick.seq : "selection"}`}
+          node={selected}
+          paths={Object.entries(result.paths ?? {}).map(([id, points]) => ({
+            id,
+            points,
+          }))}
+          boxes={walk(result.scene.root).flatMap(({ node }) => {
+            const box = bboxOf(node);
+            return box ? [{ id: node.id, role: node.role, box }] : [];
+          })}
+          paperRef={paperRef}
+          onApply={onApply}
+          anchor={
+            menuClick?.id === selected.id
+              ? menuClick
+              : (result.paths?.[selected.id]?.[
+                  Math.floor((result.paths?.[selected.id]?.length ?? 1) / 4)
+                ] ?? { x: 0.5, y: 0.25 })
+          }
+        />
+      )}
       <p className="shrink-0 px-8 py-3 text-center text-micro text-muted-foreground">
         Click an element to format · Click empty canvas to deselect · Space to
         pan · Scroll to zoom

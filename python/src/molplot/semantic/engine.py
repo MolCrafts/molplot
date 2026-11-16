@@ -20,6 +20,8 @@ from ._generated import (
 from .bbox import parse_bbox
 from .hex import is_finite_number, normalize_hex
 from .values import (
+    AXIS_FORMATS,
+    AXIS_SCALES,
     parse_bool,
     parse_dash,
     parse_name,
@@ -197,5 +199,21 @@ def check_set_command(
             return ApplyError(
                 code="invalid_value",
                 message=f"{command.property} must be a non-empty string",
+            )
+        if (
+            command.property == "format"
+            and parse_name(command.value) not in AXIS_FORMATS
+        ):
+            return ApplyError(
+                code="invalid_value",
+                message="format must be auto, scientific, plain, or percent",
+            )
+        if (
+            command.property == "scale"
+            and parse_name(command.value) not in AXIS_SCALES
+        ):
+            return ApplyError(
+                code="invalid_value",
+                message="scale must be linear, log, or symlog",
             )
     return None

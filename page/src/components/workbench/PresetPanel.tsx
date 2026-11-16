@@ -1,21 +1,21 @@
-import type { JSX } from "react";
-import { useEffect, useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { NumberField } from "@/components/ui/number-field";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  EmptyState,
+  Input,
+  ScrollArea,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@molcrafts/ui";
+import type { JSX } from "react";
+import { useEffect, useState } from "react";
 import {
   InspectorField,
   InspectorSection,
   ValueChip,
 } from "@/components/workbench/InspectorField";
+import { NumberField } from "@/components/workbench/NumberField";
 import { formatSize } from "@/lib/format";
 import type {
   CustomRc,

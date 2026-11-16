@@ -1,18 +1,20 @@
 name: test
 
-# Core (rstest) and the Python package (pytest), plus both release artifacts
-# built, in two tiers (`test / context` decides, through MolCrafts/molcrafts-ci/actions/ci-context):
+# Everything a change must pass, in two tiers (`test / context` decides,
+# through MolCrafts/molcrafts-ci/.github/workflows/context.yml):
 #
-#   fast  a feature-branch push to MolCrafts: core, package, and Python 3.10
-#         on Linux.
-#   full  every push to a fork (proven before its pull request), dev, master
-#         and main on MolCrafts, pull requests, tags and dispatches: Python on
+#   fast  a feature-branch push to MolCrafts: core, page, package, docs,
+#         lint, and Python 3.10 on Linux.
+#   full  every push to a fork (proven before its pull request), dev and
+#         master on MolCrafts, pull requests, tags and dispatches: Python on
 #         Linux, macOS and Windows, 3.10 and 3.12.
+#
+# release.yml runs this file through workflow_call before it uploads.
 on:
   push:
     branches: ["**"]
   pull_request:
-    branches: [dev, master, main]
+    branches: [dev, master]
   workflow_dispatch:
   workflow_call:
 
@@ -20,26 +22,32 @@ permissions:
   contents: read
 
 # One group per file, workflow, event and ref. Under workflow_call (release.yml
-# running lint/test) github.workflow and github.event_name are the caller's, so
+# running the tests) github.workflow and github.event_name are the caller's, so
 # a called run never shares, and so never cancels, a direct run's group.
 concurrency:
   group: test-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ !contains(fromJSON('["refs/heads/dev","refs/heads/master"]'), github.ref) && !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  # Where this run happens, decided once: MolCrafts/molcrafts-ci/actions/ci-context.
+  # Where this run happens, decided once by the shared context workflow.
   context:
-    name: test / context
+    permissions:
+      contents: read
+    name: test
+    uses: MolCrafts/molcrafts-ci/.github/workflows/context.yml@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+
+  lint:
+    name: test / lint
+    needs: context
+    if: needs.context.outputs.skip-pr != 'true'
     runs-on: ubuntu-latest
-    outputs:
-      tier: ${{ steps.context.outputs.tier }}
-      upstream: ${{ steps.context.outputs.upstream }}
-      integration: ${{ steps.context.outputs.integration }}
-      skip-pr: ${{ steps.context.outputs.skip-pr }}
-      publish: ${{ steps.context.outputs.publish }}
     steps:
-      - id: context
-        uses: MolCrafts/molcrafts-ci/actions/ci-context@master
+      - uses: actions/checkout@v7
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+      - run: npm run check:presets
+      - run: npm run check:schema
+      - run: npx biome check
+      - run: npm run typecheck
 
   core:
     name: test / core
@@ -48,8 +56,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: MolCrafts/molcrafts-ci/actions/setup-node@master
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
       - run: npm run test:core
+      - run: npm run test:page
 
   python:
     name: test / python (${{ matrix.os }}, ${{ matrix.python }})
@@ -68,7 +77,7 @@ jobs:
         working-directory: python
     steps:
       - uses: actions/checkout@v7
-      - uses: MolCrafts/molcrafts-ci/actions/setup-python@master
+      - uses: MolCrafts/molcrafts-ci/actions/setup-python@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
         with:
           python-version: ${{ matrix.python }}
       - run: uv sync --extra dev
@@ -81,9 +90,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: MolCrafts/molcrafts-ci/actions/setup-node@master
-      - uses: MolCrafts/molcrafts-ci/actions/setup-python@master
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+      - uses: MolCrafts/molcrafts-ci/actions/setup-python@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
       - run: npm run build:core
       - run: npm pack -w core --dry-run
       - run: uv build python
       - run: uvx twine check --strict python/dist/*
+
+  # The site with the source-built <molplot-chart> (docs/assets/molplot, which
+  # zensical.toml watches), --strict: any warning fails. Cloudflare Pages
+  # deploys it from MolCrafts itself, so no job here deploys.
+  docs:
+    name: test / docs
+    needs: context
+    if: needs.context.outputs.skip-pr != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: MolCrafts/molcrafts-ci/actions/setup-node@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+      - uses: MolCrafts/molcrafts-ci/actions/setup-python@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+      - run: npm run build:docs-assets
+      - run: uv run --project python --only-group doc zensical build --strict
+
+  workflow-policy:
+    name: test / workflows
+    needs: context
+    if: needs.context.outputs.skip-pr != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: MolCrafts/molcrafts-ci/actions/check-workflows@3cc26f4ff1b8b6d09365d677c4a05cc8cbb70a76
+
+  result:
+    name: test / result
+    needs: [context, lint, core, python, package, docs, workflow-policy]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every job succeeded or was skipped
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: echo "$RESULTS" | jq -e 'all(.[]; . == "success" or . == "skipped")'

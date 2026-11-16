@@ -160,7 +160,7 @@ export class VegaEngine implements Engine {
       role: "figure",
       label: "Figure",
       children,
-      components: { geometry: { bbox: { x: 0, y: 0, w: 1, h: 1 } } },
+      components: {},
       editability: {},
     };
   }
@@ -198,7 +198,7 @@ export class VegaEngine implements Engine {
       role: "panel",
       label: "Panel",
       children,
-      components: { geometry: { bbox: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 } } },
+      components: {},
       editability: {},
     };
   }
@@ -288,46 +288,47 @@ export class VegaEngine implements Engine {
     if (!match || component !== "stroke") {
       throw new Error(`no setter for ${nodeId} ${component}.${property}`);
     }
-    const index = Number(match[1]);
-    const units = layersOf(this.spec);
-    const target = units[index] ?? this.spec;
+    const target = this.seriesSpec(Number(match[1]));
     if (property === "color") {
       const hex = normalizeHex(value);
       if (!hex) throw new Error("color");
-      const mark = target.mark;
-      if (typeof mark === "string") target.mark = { type: mark, color: hex };
-      else if (mark && typeof mark === "object") {
-        target.mark = { ...(mark as object), color: hex };
-      } else {
-        target.mark = { color: hex };
-      }
+      this.patchMark(target, { color: hex });
       const enc = encoding(target);
       if (enc.color && enc.color.value !== undefined) enc.color.value = hex;
-      if (units.length > 1 && Array.isArray(this.spec.layer)) {
-        this.spec.layer = units.map((unit, i) => (i === index ? target : unit));
-      } else {
-        Object.assign(this.spec, target);
+      else {
+        const parent = encoding(this.spec);
+        if (parent.color && parent.color.value !== undefined)
+          parent.color.value = hex;
       }
       return;
     }
     if (property === "width") {
-      const width = value as number;
-      const mark = target.mark;
-      if (typeof mark === "string")
-        target.mark = { type: mark, strokeWidth: width };
-      else if (mark && typeof mark === "object") {
-        target.mark = { ...(mark as object), strokeWidth: width };
-      } else {
-        target.mark = { strokeWidth: width };
-      }
-      if (units.length > 1 && Array.isArray(this.spec.layer)) {
-        this.spec.layer = units.map((unit, i) => (i === index ? target : unit));
-      } else {
-        Object.assign(this.spec, target);
-      }
+      this.patchMark(target, { strokeWidth: value as number });
       return;
     }
     throw new Error(`no setter for stroke.${property}`);
+  }
+
+  /** The layer object to mutate. Never the parent spec spread onto that layer. */
+  private seriesSpec(index: number): Spec {
+    const layers = this.spec.layer;
+    if (Array.isArray(layers) && layers.length > 0) {
+      const layer = layers[index];
+      if (!layer || typeof layer !== "object") {
+        throw new Error(`no series ${index}`);
+      }
+      return layer as Spec;
+    }
+    if (index !== 0) throw new Error(`no series ${index}`);
+    return this.spec;
+  }
+
+  private patchMark(target: Spec, patch: Record<string, unknown>) {
+    const mark = target.mark;
+    if (typeof mark === "string") target.mark = { type: mark, ...patch };
+    else if (mark && typeof mark === "object") {
+      target.mark = { ...(mark as object), ...patch };
+    } else target.mark = { ...patch };
   }
 
   private async ensureView(): Promise<vega.View> {

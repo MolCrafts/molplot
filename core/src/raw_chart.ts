@@ -207,6 +207,8 @@ function continuousChannels(spec: VegaLiteSpec): ZoomChannel[] {
   return (["x", "y"] as const).filter((channel) => {
     const type = top?.[channel]?.type ?? layerEnc?.[channel]?.type;
     if (type === "quantitative" || type === "temporal") return true;
+    // A band axis (bar categories) cannot take a scale binding.
+    if (type === "nominal" || type === "ordinal") return false;
     const field = top?.[channel]?.field ?? layerEnc?.[channel]?.field;
     return Boolean(field && (top?.[channel]?.type || top?.[channel]));
   });

@@ -1,12 +1,12 @@
-import { type JSX, useState } from "react";
-import { EmptyState } from "@/components/ui/empty-state";
 import {
+  EmptyState,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@molcrafts/ui";
+import { type JSX, useState } from "react";
 import { formatScience } from "@/lib/format";
 import type { Dataset, HostResult } from "@/lib/host";
 import { cn } from "@/lib/utils";

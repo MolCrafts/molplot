@@ -274,7 +274,8 @@ def bar_spec(
 
     encoding = _clean(
         {
-            cat_channel: {"field": "cat", "type": "nominal", "axis": _axis(y_label if horizontal else x_label), "scale": {"paddingInner": bargap if bargap is not None else theme["geometry"]["barGap"]}},
+            # sort None: categories stay in the order given, not alphabetical.
+            cat_channel: {"field": "cat", "type": "nominal", "sort": None, "axis": _axis(y_label if horizontal else x_label), "scale": {"paddingInner": bargap if bargap is not None else theme["geometry"]["barGap"]}},
             val_channel: {"field": "val", "type": "quantitative", "axis": _axis(x_label if horizontal else y_label), "stack": True if mode_ == "stack" else None},
             "color": color_enc,
             offset_channel: {"field": "key"} if mode_ == "group" else None,

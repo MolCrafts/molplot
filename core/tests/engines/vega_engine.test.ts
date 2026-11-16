@@ -137,6 +137,59 @@ describe("VegaEngine", () => {
     ).toBe("Kinetic energy");
   });
 
+  it("edits one layer without copying the parent spec onto it", async () => {
+    const spec = {
+      data: {
+        values: [
+          { x: 0, y: 1 },
+          { x: 1, y: 2 },
+        ],
+      },
+      encoding: {
+        x: { field: "x", type: "quantitative" },
+        y: { field: "y", type: "quantitative" },
+      },
+      layer: [
+        { mark: { type: "line", color: "#0c5da5" } },
+        { mark: { type: "point", color: "#111111" } },
+      ],
+    };
+    const engine = new VegaEngine(spec);
+    const scene = engine.reflect();
+    expect(scene.root.components.geometry).toBeUndefined();
+    expect(
+      findByRole(scene.root, "panel")[0].components.geometry,
+    ).toBeUndefined();
+    const series = findByRole(scene.root, "series");
+    const result = await engine.apply(
+      {
+        type: "set",
+        nodeId: series[0].id,
+        component: "stroke",
+        property: "color",
+        value: "#cc0000",
+        baseRevision: engine.revision(),
+      },
+      "vega-layer",
+    );
+    expect(result.ok).toBe(true);
+    const stored = engine as unknown as {
+      spec: {
+        data?: unknown;
+        layer: Array<{
+          data?: unknown;
+          encoding?: unknown;
+          mark?: { color?: string };
+        }>;
+      };
+    };
+    expect(stored.spec.layer[0].data).toBeUndefined();
+    expect(stored.spec.layer[0].encoding).toBeUndefined();
+    expect(stored.spec.data).toBeDefined();
+    expect(stored.spec.layer[0].mark?.color).toBe("#cc0000");
+    expect(stored.spec.layer[1].mark?.color).toBe("#111111");
+  });
+
   it("keeps Scene when facet is unsupported", () => {
     const engine = new VegaEngine({
       ...constantLine,

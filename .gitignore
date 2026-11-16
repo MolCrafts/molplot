@@ -24,3 +24,8 @@ docs/assets/
 .DS_Store
 *.log
 .cache/
+
+# Browser test artifacts
+page/test-results/
+page/playwright-report/
+.coverage

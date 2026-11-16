@@ -110,3 +110,11 @@ def test_marks_are_clipped_to_the_plot_rect():
     """Without clip a zoomed-in mark paints over the axes."""
     for spec in _all_specs().values():
         assert all(mark["clip"] is True for mark in _marks_of(spec))
+
+
+def test_bar_spec_keeps_the_category_order():
+    spec = molplot.bar_spec(["before", "after"], [{"id": "e", "values": [2, 1]}])
+    assert spec["encoding"]["x"]["sort"] is None
+    assert [row["cat"] for row in spec["data"]["values"]] == ["before", "after"]
+    horizontal = molplot.bar_spec(["z", "a"], [{"id": "e", "values": [2, 1]}], orientation="h")
+    assert horizontal["encoding"]["y"]["sort"] is None

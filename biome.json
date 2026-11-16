@@ -13,7 +13,9 @@
       "!**/.cache",
       "!**/*.css",
       "!**/presets/generated.ts",
-      "!**/semantic/generated.ts"
+      "!**/semantic/generated.ts",
+      "!**/test-results",
+      "!**/playwright-report"
     ]
   },
   "formatter": {

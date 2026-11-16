@@ -1,19 +1,20 @@
-import { Download, Redo2, Scan, Table2, Undo2 } from "lucide-react";
-import type { JSX } from "react";
-import { Button } from "@/components/ui/button";
 import {
+  ArrowAutofitContentRegular,
+  ArrowDownloadRegular,
+  GridRegular,
+} from "@fluentui/react-icons";
+import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { IconButton } from "@/components/ui/icon-button";
-import { Separator } from "@/components/ui/separator";
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@molcrafts/ui";
+import type { JSX } from "react";
+import { IconButton } from "@/components/ui/icon-button";
 import { EXPORT_FORMATS, type ExportFormat } from "@/lib/host";
 
 export function PlotToolbar({
@@ -29,12 +30,13 @@ export function PlotToolbar({
 }): JSX.Element {
   return (
     <>
-      <IconButton icon={<Undo2 />} label="Undo" disabled />
-      <IconButton icon={<Redo2 />} label="Redo" disabled />
-      <Separator orientation="vertical" className="mx-1 h-5" />
-      <IconButton icon={<Scan />} label="Fit canvas" onClick={onFit} />
       <IconButton
-        icon={<Table2 />}
+        icon={<ArrowAutofitContentRegular />}
+        label="Fit canvas"
+        onClick={onFit}
+      />
+      <IconButton
+        icon={<GridRegular />}
         label="Canvas grid"
         selected={grid}
         onClick={onToggleGrid}
@@ -49,7 +51,7 @@ export function PlotToolbar({
                 aria-label="Export"
                 className="size-control-compact border-0 shadow-none [&_svg]:size-4"
               >
-                <Download />
+                <ArrowDownloadRegular />
               </Button>
             </DropdownMenuTrigger>
           </TooltipTrigger>

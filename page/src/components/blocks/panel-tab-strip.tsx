@@ -5,13 +5,14 @@
  * glyph over a hairline underline — never a filled pill.
  */
 
-import type { JSX, ReactNode } from "react";
-import { TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  TabsList,
+  TabsTrigger,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from "@molcrafts/ui";
+import type { ComponentProps, JSX, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export interface PanelTabItem {
@@ -25,7 +26,7 @@ export interface PanelTabStripProps {
   /** Accessible name of the strip itself, e.g. "Data, elements, or preset". */
   label: string;
   disabled?: boolean;
-  tooltipSide?: React.ComponentProps<typeof TooltipContent>["side"];
+  tooltipSide?: ComponentProps<typeof TooltipContent>["side"];
   className?: string;
 }
 
@@ -69,6 +70,7 @@ export function PanelTabStrip({
               >
                 {item.icon}
               </span>
+              <span className="ml-1.5 text-label">{item.label}</span>
             </TabsTrigger>
           </TooltipTrigger>
           <TooltipContent side={tooltipSide}>{item.label}</TooltipContent>

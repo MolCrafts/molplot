@@ -28,22 +28,93 @@ export function clampBox(
   return { box: { x, y, w: minSpan, h: minSpan }, clipped: true };
 }
 
-/** Place a floating menu near a click, flipping if it would leave the paper. */
+/** Stay beside the click; flip at the edges and prefer clear space among nearby positions. */
 export function placeQuickMenu(
   click: { x: number; y: number },
-  paper: { w: number; h: number },
+  area: { x?: number; y?: number; w: number; h: number },
   menu: { w: number; h: number },
   gap = 10,
-): { x: number; y: number } {
-  const maxX = Math.max(gap, paper.w - menu.w - gap);
-  const maxY = Math.max(gap, paper.h - menu.h - gap);
-  let x = click.x - menu.w / 2;
-  let y = click.y - menu.h - gap;
-  if (y < gap) y = click.y + gap;
-  if (y > maxY) y = Math.max(gap, click.y - menu.h - gap);
-  x = Math.min(Math.max(gap, x), maxX);
-  y = Math.min(Math.max(gap, y), maxY);
-  return { x, y };
+  obstacles: readonly BBox[] = [],
+): { x: number; y: number } | null {
+  const left = (area.x ?? 0) + gap;
+  const top = (area.y ?? 0) + gap;
+  const right = (area.x ?? 0) + area.w - menu.w - gap;
+  const bottom = (area.y ?? 0) + area.h - menu.h - gap;
+  if (right < left || bottom < top) return null;
+  // Only the four positions touching the pointer's gap are candidates. Dense
+  // chart ink must never send the panel to the other side of the chart.
+  const xs = [click.x + gap, click.x - menu.w - gap];
+  const ys = [click.y + gap, click.y - menu.h - gap];
+  if (click.x + gap > right) xs.reverse();
+  if (click.y + gap > bottom) ys.reverse();
+  const candidates = ys.flatMap((y) =>
+    xs.map((x) => ({
+      x: Math.min(right, Math.max(left, x)),
+      y: Math.min(bottom, Math.max(top, y)),
+    })),
+  );
+  const overlap = (p: { x: number; y: number }, b: BBox) =>
+    Math.max(0, Math.min(p.x + menu.w, b.x + b.w) - Math.max(p.x, b.x)) *
+    Math.max(0, Math.min(p.y + menu.h, b.y + b.h) - Math.max(p.y, b.y));
+  const pointer = {
+    x: click.x - gap,
+    y: click.y - gap,
+    w: gap * 2,
+    h: gap * 2,
+  };
+  // Keep the clicked point clear first, then avoid nearby labels and curves.
+  candidates.sort(
+    (a, b) =>
+      overlap(a, pointer) - overlap(b, pointer) ||
+      obstacles.reduce(
+        (sum, box) => sum + overlap(a, box) - overlap(b, box),
+        0,
+      ),
+  );
+  return candidates[0] ?? null;
+}
+
+/** Convert the existing chart hit geometry to padded screen-space obstacles. */
+export function quickMenuObstacles(
+  paths: readonly { id: string; points: readonly { x: number; y: number }[] }[],
+  boxes: readonly { id: string; role: string; box: BBox }[],
+  frame: BBox,
+): BBox[] {
+  const result: BBox[] = [];
+  const add = (x: number, y: number, w: number, h: number) =>
+    result.push({
+      x: frame.x + x * frame.w - 4,
+      y: frame.y + y * frame.h - 4,
+      w: w * frame.w + 8,
+      h: h * frame.h + 8,
+    });
+  for (const { id, role, box } of boxes) {
+    if (role === "figure") continue;
+    if (role === "panel") {
+      add(box.x, box.y, box.w, 0);
+      add(box.x, box.y + box.h, box.w, 0);
+      add(box.x, box.y, 0, box.h);
+      add(box.x + box.w, box.y, 0, box.h);
+    } else if (
+      role !== "series" ||
+      !paths.some((path) => path.id === id || path.id.startsWith(`${id}/`))
+    )
+      add(box.x, box.y, box.w, box.h);
+  }
+  for (const path of paths) {
+    for (let i = 0; i < path.points.length; i++) {
+      const a = path.points[i];
+      const b = path.points[Math.max(0, i - 1)];
+      if (!a || !b || ![a.x, a.y, b.x, b.y].every(Number.isFinite)) continue;
+      add(
+        Math.min(a.x, b.x),
+        Math.min(a.y, b.y),
+        Math.abs(a.x - b.x),
+        Math.abs(a.y - b.y),
+      );
+    }
+  }
+  return result;
 }
 
 export function pathToD(points: readonly { x: number; y: number }[]): string {

@@ -120,6 +120,13 @@ describe("scatterSpec", () => {
 });
 
 describe("barSpec", () => {
+  it("keeps categories in data order", () => {
+    const spec = S(
+      barSpec({ series: [{ id: "a", points: [] }], mode: "group" }, light),
+    );
+    expect(spec.layer[0].encoding.x.sort).toBeNull();
+  });
+
   it("groups with an offset channel", () => {
     const spec = S(
       barSpec({ series: [{ id: "a", points: [] }], mode: "group" }, light),

@@ -55,8 +55,19 @@ export interface ZoomParam {
  * never went through a builder (`RawChart`).
  */
 export function zoomParamsOf(spec: VegaLiteSpec): ZoomParam[] {
-  const layers = spec.layer as { params?: ZoomParam[] }[] | undefined;
-  return (spec.params as ZoomParam[]) ?? layers?.[0]?.params ?? [];
+  const layers = spec.layer as { params?: unknown[] }[] | undefined;
+  const params =
+    (spec.params as unknown[] | undefined) ?? layers?.[0]?.params ?? [];
+  // Other params (a legend selection) share the list; only scale bindings zoom.
+  return params.filter(
+    (param): param is ZoomParam =>
+      typeof param === "object" &&
+      param !== null &&
+      (param as { bind?: unknown }).bind === "scales" &&
+      Array.isArray(
+        (param as { select?: { encodings?: unknown } }).select?.encodings,
+      ),
+  );
 }
 
 /**
@@ -382,6 +393,8 @@ export function barSpec(
   const catEnc = {
     field: "cat",
     type: "nominal",
+    // null: categories stay in data order, not alphabetical.
+    sort: null,
     axis: axisDef(catAxis),
     scale: { paddingInner: config.bargap ?? theme.geometry.barGap },
   };

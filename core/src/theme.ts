@@ -216,6 +216,8 @@ export function vegaConfig(
       titleLimit: Math.round(240 * scale),
       labelOverlap: true,
       labelFlush: true,
+      // Nominal axes otherwise default to a vertical label.
+      labelAngle: 0,
     },
     legend: {
       labelColor: theme.font.color,

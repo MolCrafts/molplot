@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 from molplot.host.server import create_app
 from molplot.host.workspace import Workspace
 
+POSIX = os.name == "posix"
+
 
 def teardown_function():
     plt.close("all")
@@ -185,10 +187,16 @@ def test_cli_reuses_running_server(tmp_path):
             assert len(catalog["figures"]) == 3
             assert catalog["instanceId"] == initial["instanceId"]
             assert server.poll() is None
-            assert not any(
-                path.stat().st_mode & 0o077 for path in runtime.glob("*.json")
-            )
+            # POSIX mode bits keep the bearer token private; Windows relies
+            # on the per-user temp directory's ACL and reports no such bits.
+            if POSIX:
+                assert not any(
+                    path.stat().st_mode & 0o077 for path in runtime.glob("*.json")
+                )
         finally:
             server.terminate()
             server.wait(timeout=10)
-    assert not list(runtime.glob("*.json"))
+    # terminate() is SIGTERM on POSIX, so the server forgets its record; on
+    # Windows it is TerminateProcess and no shutdown code runs.
+    if POSIX:
+        assert not list(runtime.glob("*.json"))
